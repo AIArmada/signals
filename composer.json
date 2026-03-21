@@ -1,0 +1,39 @@
+{
+    "name": "aiarmada/signals",
+    "description": "Privacy-first behavioral analytics foundation for Laravel applications",
+    "license": "MIT",
+    "type": "library",
+    "keywords": [
+        "laravel",
+        "analytics",
+        "signals",
+        "product-analytics",
+        "behavioral-analytics"
+    ],
+    "authors": [
+        {
+            "name": "AIArmada",
+            "email": "dev@aiarmada.com"
+        }
+    ],
+    "require": {
+        "aiarmada/commerce-support": "self.version"
+    },
+    "autoload": {
+        "psr-4": {
+            "AIArmada\\Signals\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "AIArmada\\Signals\\SignalsServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
