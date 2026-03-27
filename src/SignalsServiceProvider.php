@@ -6,9 +6,12 @@ namespace AIArmada\Signals;
 
 use AIArmada\Signals\Console\Commands\AggregateDailyMetricsCommand;
 use AIArmada\Signals\Console\Commands\ProcessSignalAlertsCommand;
+use AIArmada\Signals\Contracts\SignalLocationResolverContract;
 use AIArmada\Signals\Services\CommerceSignalsRecorder;
+use AIArmada\Signals\Services\Geocoders\NominatimGeocoder;
 use AIArmada\Signals\Services\SignalAlertDispatcher;
 use AIArmada\Signals\Services\SignalAlertEvaluator;
+use AIArmada\Signals\Services\SignalLocationResolverPipeline;
 use AIArmada\Signals\Services\SignalMetricsAggregator;
 use AIArmada\Signals\Services\SignalsDashboardService;
 use AIArmada\Signals\Services\TrackedPropertyResolver;
@@ -38,6 +41,16 @@ final class SignalsServiceProvider extends PackageServiceProvider
         $this->app->singleton(CommerceSignalsRecorder::class);
         $this->app->singleton(SignalAlertEvaluator::class);
         $this->app->singleton(SignalAlertDispatcher::class);
+        $this->app->singleton(SignalLocationResolverPipeline::class, function ($app): SignalLocationResolverPipeline {
+            $pipeline = new SignalLocationResolverPipeline;
+            $pipeline->registerGeocoder($app->make(NominatimGeocoder::class));
+
+            if ($app->bound(SignalLocationResolverContract::class)) {
+                $pipeline->registerResolver($app->make(SignalLocationResolverContract::class));
+            }
+
+            return $pipeline;
+        });
     }
 
     public function packageBooted(): void

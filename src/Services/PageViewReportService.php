@@ -19,7 +19,7 @@ final class PageViewReportService
     {
         return $this->segmentReportFilter->applyToEventQuery(SignalEvent::query(), $signalSegmentId)
             ->select('tracked_property_id')
-            ->selectRaw('MIN(id) as id')
+            ->selectRaw('MIN(CAST(id AS text)) as id')
             ->selectRaw("COALESCE(path, '/') as page_path")
             ->selectRaw('MAX(url) as page_url')
             ->selectRaw('COUNT(*) as views')

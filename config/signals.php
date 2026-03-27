@@ -57,6 +57,28 @@ return [
             'include_global' => false,
             'auto_assign_on_create' => true,
         ],
+        'ua_parsing' => [
+            'enabled' => true,
+            'store_raw' => true, // store the raw User-Agent string on signal_sessions
+        ],
+        'ip_tracking' => [
+            'enabled' => true,
+            'anonymize' => false, // true = zero-out last octet (IPv4) / last 80 bits (IPv6)
+        ],
+        'auth_tracking' => [
+            'enabled' => false, // opt-in: when true, links auth()->user() to SignalIdentity
+        ],
+        'geolocation' => [
+            'enabled' => true,  // allow browser geolocation coordinate capture via /collect/geo
+            'reverse_geocode' => [
+                'enabled' => false,  // opt-in: reverse-geocode coordinates to address fields
+                'async' => true,     // dispatch ReverseGeocodeSessionJob instead of inline
+                'store_raw_payload' => false, // persist raw provider response in raw_reverse_geocode_payload
+            ],
+        ],
+        'monetary' => [
+            'enabled' => true,  // false = hide all monetary/revenue UI (stat cards, columns, goal types, alert metrics, condition fields)
+        ],
     ],
 
     /* Integrations */

@@ -65,7 +65,7 @@ final class AcquisitionReportService
 
         return $query
             ->select('tracked_property_id')
-            ->selectRaw('MIN(id) as id')
+            ->selectRaw('MIN(CAST(id AS text)) as id')
             ->selectRaw("COALESCE({$sourceExpression}, 'direct') as acquisition_source")
             ->selectRaw("COALESCE({$mediumExpression}, 'direct') as acquisition_medium")
             ->selectRaw("COALESCE({$campaignExpression}, '(none)') as acquisition_campaign")

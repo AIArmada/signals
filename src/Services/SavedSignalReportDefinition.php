@@ -192,7 +192,7 @@ final class SavedSignalReportDefinition
 
     /**
      * @param  array<string, mixed>|array<int, array<string, mixed>>|null  $settings
-     * @return list<array{label:string,event_name:string,event_category:string|null}>
+     * @return list<array{label:string,step_type:string,event_name:string|null,event_category:string|null,goal_slug:string|null,route_name:string|null,condition_match_type:string,conditions:array<int, array<string, mixed>>|null}>
      */
     public static function funnelSteps(?array $settings): array
     {
@@ -203,7 +203,7 @@ final class SavedSignalReportDefinition
             return [];
         }
 
-        /** @var list<array{label:string,event_name:string,event_category:string|null}> $normalizedSteps */
+        /** @var list<array{label:string,step_type:string,event_name:string|null,event_category:string|null,goal_slug:string|null,route_name:string|null,condition_match_type:string,conditions:array<int, array<string, mixed>>|null}> $normalizedSteps */
         $normalizedSteps = [];
 
         foreach ($steps as $step) {
@@ -212,22 +212,128 @@ final class SavedSignalReportDefinition
             }
 
             $label = mb_trim((string) ($step['label'] ?? ''));
+            $stepType = mb_trim((string) ($step['step_type'] ?? ''));
             $eventName = mb_trim((string) ($step['event_name'] ?? ''));
+            $goalSlug = mb_trim((string) ($step['goal_slug'] ?? ''));
+            $routeName = mb_trim((string) ($step['route_name'] ?? ''));
+            $conditionMatchType = mb_trim((string) ($step['condition_match_type'] ?? 'all'));
+            $pathOperator = mb_trim((string) ($step['path_operator'] ?? 'equals'));
+            $pathValue = mb_trim((string) ($step['path_value'] ?? ''));
 
-            if ($label === '' || $eventName === '') {
+            if ($label === '') {
                 continue;
             }
 
             $eventCategory = mb_trim((string) ($step['event_category'] ?? ''));
+            $conditions = self::normalizeFunnelConditions($step['conditions'] ?? null);
+
+            if ($pathValue !== '') {
+                $conditions[] = [
+                    'field' => 'path',
+                    'operator' => in_array($pathOperator, ['equals', 'contains', 'starts_with', 'ends_with'], true) ? $pathOperator : 'equals',
+                    'value' => $pathValue,
+                ];
+            }
+
+            if ($stepType === '') {
+                $stepType = $goalSlug !== ''
+                    ? 'goal'
+                    : ($routeName !== ''
+                        ? 'route'
+                        : ($conditions !== [] && $eventName !== '' ? 'conditions' : 'event'));
+            }
+
+            if (! in_array($stepType, ['goal', 'event', 'route', 'conditions'], true)) {
+                $stepType = 'event';
+            }
+
+            if ($stepType === 'goal' && $goalSlug === '') {
+                continue;
+            }
+
+            if ($stepType === 'route' && $routeName === '') {
+                continue;
+            }
+
+            if ($stepType === 'conditions' && $eventName === '') {
+                continue;
+            }
+
+            if ($goalSlug === '' && $routeName === '' && $eventName === '' && $conditions === []) {
+                continue;
+            }
+
+            if ($goalSlug === '' && $eventName === '' && $conditions !== []) {
+                $eventName = (string) config('signals.defaults.page_view_event_name', 'page_view');
+
+                if ($eventCategory === '') {
+                    $eventCategory = 'page_view';
+                }
+            }
 
             $normalizedSteps[] = [
                 'label' => $label,
-                'event_name' => $eventName,
+                'step_type' => $stepType,
+                'event_name' => $eventName !== '' ? $eventName : null,
                 'event_category' => $eventCategory !== '' ? $eventCategory : null,
+                'goal_slug' => $goalSlug !== '' ? $goalSlug : null,
+                'route_name' => $routeName !== '' ? $routeName : null,
+                'condition_match_type' => in_array($conditionMatchType, ['all', 'any'], true) ? $conditionMatchType : 'all',
+                'conditions' => $conditions !== [] ? $conditions : null,
             ];
         }
 
         return $normalizedSteps;
+    }
+
+    /**
+     * @return list<array{field:string,operator:string,value:string}>
+     */
+    private static function normalizeFunnelConditions(mixed $conditions): array
+    {
+        if (! is_array($conditions)) {
+            return [];
+        }
+
+        $normalizedConditions = [];
+
+        foreach ($conditions as $index => $condition) {
+            if (! is_array($condition)) {
+                throw new InvalidArgumentException("Invalid funnel condition at index {$index}: each condition must be an array.");
+            }
+
+            $field = is_string($condition['field'] ?? null) ? mb_trim($condition['field']) : '';
+            $operator = is_string($condition['operator'] ?? null) ? mb_trim($condition['operator']) : '';
+            $value = is_string($condition['value'] ?? null) ? mb_trim($condition['value']) : '';
+
+            if ($field === '' || ! SignalEventConditionDefinition::isSupportedField($field)) {
+                throw new InvalidArgumentException("Invalid funnel condition at index {$index}: unsupported field [{$field}].");
+            }
+
+            if ($operator === '' || ! SignalEventConditionDefinition::isSupportedOperator($operator)) {
+                throw new InvalidArgumentException("Invalid funnel condition at index {$index}: unsupported operator [{$operator}].");
+            }
+
+            if ($value === '') {
+                throw new InvalidArgumentException("Invalid funnel condition at index {$index}: value is required.");
+            }
+
+            if (SignalEventConditionDefinition::operatorRequiresNumericComparison($operator) && ! SignalEventConditionDefinition::fieldSupportsNumericComparison($field)) {
+                throw new InvalidArgumentException("Invalid funnel condition at index {$index}: operator [{$operator}] requires a numeric field.");
+            }
+
+            if ($operator === 'in' && array_values(array_filter(array_map('trim', explode(',', $value)), static fn (string $item): bool => $item !== '')) === []) {
+                throw new InvalidArgumentException("Invalid funnel condition at index {$index}: in-list conditions require at least one value.");
+            }
+
+            $normalizedConditions[] = [
+                'field' => $field,
+                'operator' => $operator,
+                'value' => $value,
+            ];
+        }
+
+        return $normalizedConditions;
     }
 
     /**
@@ -375,7 +481,7 @@ final class SavedSignalReportDefinition
         $normalized = [];
 
         if ($normalizedSteps !== []) {
-            $normalized['funnel_steps'] = $normalizedSteps;
+            $normalized['funnel_steps'] = self::serializeFunnelSteps($normalizedSteps);
         }
 
         $stepWindowMinutes = self::stepWindowMinutes($settings);
@@ -385,6 +491,49 @@ final class SavedSignalReportDefinition
         }
 
         return $normalized === [] ? null : $normalized;
+    }
+
+    /**
+     * @param  list<array{label:string,step_type:string,event_name:string|null,event_category:string|null,goal_slug:string|null,route_name:string|null,condition_match_type:string,conditions:array<int, array<string, mixed>>|null}>  $steps
+     * @return list<array<string, mixed>>
+     */
+    private static function serializeFunnelSteps(array $steps): array
+    {
+        $serializedSteps = [];
+
+        foreach ($steps as $step) {
+            $serializedStep = [
+                'label' => $step['label'],
+            ];
+
+            if ($step['event_name'] !== null) {
+                $serializedStep['event_name'] = $step['event_name'];
+            }
+
+            if ($step['event_category'] !== null) {
+                $serializedStep['event_category'] = $step['event_category'];
+            }
+
+            if ($step['goal_slug'] !== null) {
+                $serializedStep['goal_slug'] = $step['goal_slug'];
+            }
+
+            if ($step['route_name'] !== null) {
+                $serializedStep['route_name'] = $step['route_name'];
+            }
+
+            if ($step['condition_match_type'] !== 'all') {
+                $serializedStep['condition_match_type'] = $step['condition_match_type'];
+            }
+
+            if ($step['conditions'] !== null) {
+                $serializedStep['conditions'] = $step['conditions'];
+            }
+
+            $serializedSteps[] = $serializedStep;
+        }
+
+        return $serializedSteps;
     }
 
     /**

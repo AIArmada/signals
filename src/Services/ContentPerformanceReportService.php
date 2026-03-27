@@ -39,7 +39,7 @@ final class ContentPerformanceReportService
 
         return $this->baseQuery($context['tracked_property_id'], $context['from'], $context['until'], $context['signal_segment_id'])
             ->select('tracked_property_id')
-            ->selectRaw('MIN(id) as id')
+            ->selectRaw('MIN(CAST(id AS text)) as id')
             ->selectRaw('MIN(path) as content_path')
             ->selectRaw('MAX(url) as content_url')
             ->selectRaw("'{$this->escapeSqlLiteral($this->getBreakdownLabel($savedReportId))}' as content_breakdown_label")

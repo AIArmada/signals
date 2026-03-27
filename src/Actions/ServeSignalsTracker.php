@@ -38,6 +38,7 @@ final class ServeSignalsTracker
   var sessionCookieName = script.dataset.sessionCookieName || 'mi_signals_session_id';
   var externalId = script.dataset.externalId || null;
   var email = script.dataset.email || null;
+  var enableGeolocation = script.dataset.enableGeolocation === 'true';
 
   if (!endpoint) {
     trackerUrl.pathname = trackerUrl.pathname.replace(/__TRACKER_SCRIPT_PATTERN__$/, '/collect/pageview');
@@ -45,6 +46,14 @@ final class ServeSignalsTracker
     trackerUrl.hash = '';
     endpoint = trackerUrl.toString();
   }
+
+  var geoEndpoint = (function () {
+    var u = new URL(script.src, window.location.href);
+    u.pathname = u.pathname.replace(/__TRACKER_SCRIPT_PATTERN__$/, '/collect/geo');
+    u.search = '';
+    u.hash = '';
+    return u.toString();
+  }());
 
   var sessionKey = 'signals:session:' + writeKey;
   var anonymousKey = 'signals:anonymous:' + writeKey;
@@ -228,8 +237,54 @@ final class ServeSignalsTracker
     setTimeout(sendPageView, 0);
   });
 
+  function captureGeolocation() {
+    if (!enableGeolocation) {
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      return;
+    }
+
+    var geoKey = 'signals:geo-captured:' + writeKey;
+
+    if (sessionStorage.getItem(geoKey) === '1') {
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      function (position) {
+        sessionStorage.setItem(geoKey, '1');
+
+        var body = JSON.stringify({
+          write_key: writeKey,
+          session_identifier: sessionIdentifier(),
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy || null
+        });
+
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(geoEndpoint, new Blob([body], { type: 'application/json' }));
+          return;
+        }
+
+        fetch(geoEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: body,
+          keepalive: true,
+          credentials: 'omit'
+        }).catch(function () {});
+      },
+      function () {},
+      { timeout: 10000, maximumAge: 300000 }
+    );
+  }
+
   sendIdentify();
   sendPageView();
+  setTimeout(captureGeolocation, 500);
 })();
 JS;
 

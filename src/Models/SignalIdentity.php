@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $email
  * @property string|null $owner_type
  * @property string|null $owner_id
+ * @property string|null $auth_user_type
+ * @property string|null $auth_user_id
  * @property array<string, mixed>|null $traits
  * @property CarbonImmutable|null $first_seen_at
  * @property CarbonImmutable|null $last_seen_at
@@ -47,6 +49,8 @@ final class SignalIdentity extends Model
         'traits',
         'first_seen_at',
         'last_seen_at',
+        'auth_user_type',
+        'auth_user_id',
         'owner_type',
         'owner_id',
     ];

@@ -18,7 +18,7 @@ return new class extends Migration
             $table->nullableUuidMorphs('owner');
             $table->timestamp('started_at');
             $table->timestamp('ended_at')->nullable();
-            $table->unsignedInteger('duration_seconds')->default(0);
+            $table->unsignedBigInteger('duration_milliseconds')->default(0);
             $table->string('entry_path')->nullable();
             $table->string('exit_path')->nullable();
             $table->string('country', 2)->nullable();

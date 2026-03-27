@@ -23,13 +23,35 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $owner_id
  * @property CarbonImmutable $started_at
  * @property CarbonImmutable|null $ended_at
- * @property int $duration_seconds
+ * @property int $duration_milliseconds
  * @property string|null $entry_path
  * @property string|null $exit_path
  * @property string|null $country
+ * @property string|null $country_source
+ * @property float|null $latitude
+ * @property float|null $longitude
+ * @property int|null $accuracy_meters
+ * @property string|null $geolocation_source
+ * @property CarbonImmutable|null $geolocation_captured_at
+ * @property string|null $resolved_country_code
+ * @property string|null $resolved_country_name
+ * @property string|null $resolved_state
+ * @property string|null $resolved_city
+ * @property string|null $resolved_postcode
+ * @property string|null $resolved_formatted_address
+ * @property string|null $reverse_geocode_provider
+ * @property CarbonImmutable|null $reverse_geocoded_at
+ * @property array<string, mixed>|null $raw_reverse_geocode_payload
  * @property string|null $device_type
+ * @property string|null $device_brand
+ * @property string|null $device_model
  * @property string|null $browser
+ * @property string|null $browser_version
  * @property string|null $os
+ * @property string|null $os_version
+ * @property bool $is_bot
+ * @property string|null $user_agent
+ * @property string|null $ip_address
  * @property string|null $referrer
  * @property string|null $utm_source
  * @property string|null $utm_medium
@@ -57,13 +79,35 @@ final class SignalSession extends Model
         'session_identifier',
         'started_at',
         'ended_at',
-        'duration_seconds',
+        'duration_milliseconds',
         'entry_path',
         'exit_path',
         'country',
+        'country_source',
+        'latitude',
+        'longitude',
+        'accuracy_meters',
+        'geolocation_source',
+        'geolocation_captured_at',
+        'resolved_country_code',
+        'resolved_country_name',
+        'resolved_state',
+        'resolved_city',
+        'resolved_postcode',
+        'resolved_formatted_address',
+        'reverse_geocode_provider',
+        'reverse_geocoded_at',
+        'raw_reverse_geocode_payload',
         'device_type',
+        'device_brand',
+        'device_model',
         'browser',
+        'browser_version',
         'os',
+        'os_version',
+        'is_bot',
+        'user_agent',
+        'ip_address',
         'referrer',
         'utm_source',
         'utm_medium',
@@ -79,8 +123,15 @@ final class SignalSession extends Model
     protected $casts = [
         'started_at' => 'immutable_datetime',
         'ended_at' => 'immutable_datetime',
-        'duration_seconds' => 'integer',
+        'duration_milliseconds' => 'integer',
         'is_bounce' => 'boolean',
+        'is_bot' => 'boolean',
+        'latitude' => 'float',
+        'longitude' => 'float',
+        'accuracy_meters' => 'integer',
+        'geolocation_captured_at' => 'immutable_datetime',
+        'reverse_geocoded_at' => 'immutable_datetime',
+        'raw_reverse_geocode_payload' => 'array',
     ];
 
     public function getTable(): string

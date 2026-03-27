@@ -17,7 +17,8 @@
         }
     ],
     "require": {
-        "aiarmada/commerce-support": "self.version"
+        "aiarmada/commerce-support": "self.version",
+        "matomo/device-detector": "^6.4"
     },
     "autoload": {
         "psr-4": {

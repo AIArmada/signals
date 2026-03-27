@@ -8,6 +8,8 @@ use AIArmada\Signals\Models\SignalIdentity;
 use AIArmada\Signals\Models\TrackedProperty;
 use AIArmada\Signals\Services\SignalsIngestionRequestValidator;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -29,6 +31,8 @@ final class IdentifySignalIdentity
 
         $traits = is_array($payload['traits'] ?? null) ? $payload['traits'] : null;
 
+        [$authUserType, $authUserId] = $this->resolveAuthUser($payload);
+
         $identity->fill([
             'email' => $payload['email'] ?? $identity->email,
             'external_id' => $payload['external_id'] ?? $identity->external_id,
@@ -36,6 +40,8 @@ final class IdentifySignalIdentity
             'traits' => $traits ?? $identity->traits,
             'first_seen_at' => $identity->first_seen_at ?? $seenAt,
             'last_seen_at' => $seenAt,
+            'auth_user_type' => $authUserType ?? $identity->auth_user_type,
+            'auth_user_id' => $authUserId ?? $identity->auth_user_id,
         ]);
 
         if (! $identity->exists) {
@@ -56,6 +62,8 @@ final class IdentifySignalIdentity
             'anonymous_id' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email'],
             'traits' => ['nullable', 'array'],
+            'auth_user_type' => ['nullable', 'string', 'max:255'],
+            'auth_user_id' => ['nullable', 'string', 'max:255'],
             'seen_at' => ['nullable', 'date'],
         ]);
 
@@ -123,5 +131,41 @@ final class IdentifySignalIdentity
 
         $identity->owner_type = $trackedProperty->owner_type;
         $identity->owner_id = $trackedProperty->owner_id;
+    }
+
+    /**
+     * Resolve auth user type and ID from the payload or — when auth_tracking is
+     * enabled — from the currently authenticated Laravel user.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{string|null, string|null}
+     */
+    private function resolveAuthUser(array $payload): array
+    {
+        // Explicit payload values take priority
+        if (($payload['auth_user_type'] ?? null) !== null && ($payload['auth_user_id'] ?? null) !== null) {
+            return [(string) $payload['auth_user_type'], (string) $payload['auth_user_id']];
+        }
+
+        if (! config('signals.features.auth_tracking.enabled', false)) {
+            return [null, null];
+        }
+
+        if (! auth()->check()) {
+            return [null, null];
+        }
+
+        /** @var Authenticatable $user */
+        $user = auth()->user();
+
+        $morphMap = Relation::morphMap();
+        $userClass = get_class($user);
+        $userType = array_search($userClass, $morphMap, true);
+
+        if ($userType === false) {
+            $userType = $userClass;
+        }
+
+        return [(string) $userType, (string) $user->getAuthIdentifier()];
     }
 }

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use AIArmada\Signals\Actions\CaptureSignalGeolocation;
 use AIArmada\Signals\Actions\CaptureSignalPageView;
 use AIArmada\Signals\Actions\IdentifySignalIdentity;
 use AIArmada\Signals\Actions\IngestSignalEvent;
@@ -22,4 +23,7 @@ Route::middleware(config('signals.http.middleware', ['api']))
 
         Route::post('/collect/pageview', [CaptureSignalPageView::class, 'asController'])
             ->name('signals.collect.pageview');
+
+        Route::post('/collect/geo', [CaptureSignalGeolocation::class, 'asController'])
+            ->name('signals.collect.geo');
     });

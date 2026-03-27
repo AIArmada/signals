@@ -6,13 +6,18 @@ namespace AIArmada\Signals\Services;
 
 use AIArmada\Signals\Models\SavedSignalReport;
 use AIArmada\Signals\Models\SignalEvent;
+use AIArmada\Signals\Models\SignalGoal;
 use AIArmada\Signals\Models\TrackedProperty;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
 final class ConversionFunnelReportService
 {
-    public function __construct(private readonly SignalSegmentReportFilter $segmentReportFilter) {}
+    public function __construct(
+        private readonly SignalSegmentReportFilter $segmentReportFilter,
+        private readonly SignalEventConditionQueryService $conditionQueryService,
+        private readonly SignalEventConditionMatcher $conditionMatcher,
+    ) {}
 
     /**
      * @return array{started:int,completed:int,paid:int,started_label:string,completed_label:string,paid_label:string,start_to_complete_rate:float,complete_to_paid_rate:float,overall_rate:float,start_drop_off:int,complete_drop_off:int,revenue_minor:int}
@@ -106,7 +111,7 @@ final class ConversionFunnelReportService
     {
         $steps = $this->resolveFunnelSteps($savedReport);
 
-        if (count($steps) < 2) {
+        if ($steps === []) {
             return [];
         }
 
@@ -155,7 +160,7 @@ final class ConversionFunnelReportService
     }
 
     /**
-     * @param  list<array{label:string,event_name:string,event_category:string|null}>  $steps
+     * @param  list<array{label:string,event_name:string,event_category:string|null,condition_match_type:string,conditions:array<int, array<string, mixed>>|null}>  $steps
      * @return list<array{count:int,revenue_minor:int}>
      */
     private function calculateStageProgress(?string $trackedPropertyId, ?string $from, ?string $until, ?string $signalSegmentId, array $steps, ?SavedSignalReport $savedReport): array
@@ -185,7 +190,7 @@ final class ConversionFunnelReportService
 
     /**
      * @param  list<SignalEvent>  $actorEvents
-     * @param  list<array{label:string,event_name:string,event_category:string|null}>  $steps
+     * @param  list<array{label:string,event_name:string,event_category:string|null,condition_match_type:string,conditions:array<int, array<string, mixed>>|null}>  $steps
      * @param  array<int, int>  $counts
      * @param  array<int, int>  $revenues
      */
@@ -230,7 +235,7 @@ final class ConversionFunnelReportService
     }
 
     /**
-     * @param  list<array{label:string,event_name:string,event_category:string|null}>  $steps
+     * @param  list<array{label:string,event_name:string,event_category:string|null,condition_match_type:string,conditions:array<int, array<string, mixed>>|null}>  $steps
      * @return Builder<SignalEvent>
      */
     private function relevantEventsQuery(?string $trackedPropertyId, ?string $from, ?string $until, ?string $signalSegmentId, array $steps): Builder
@@ -246,6 +251,8 @@ final class ConversionFunnelReportService
                         if ($step['event_category'] !== null) {
                             $stepQuery->where('event_category', $step['event_category']);
                         }
+
+                        $this->conditionQueryService->apply($stepQuery, $step['conditions'], $step['condition_match_type']);
                     });
                 }
             })
@@ -254,7 +261,7 @@ final class ConversionFunnelReportService
     }
 
     /**
-     * @param  array{label:string,event_name:string,event_category:string|null}  $step
+     * @param  array{label:string,event_name:string,event_category:string|null,condition_match_type:string,conditions:array<int, array<string, mixed>>|null}  $step
      */
     private function matchesStep(SignalEvent $event, array $step): bool
     {
@@ -262,7 +269,11 @@ final class ConversionFunnelReportService
             return false;
         }
 
-        return $step['event_category'] === null || $event->event_category === $step['event_category'];
+        if ($step['event_category'] !== null && $event->event_category !== $step['event_category']) {
+            return false;
+        }
+
+        return $this->conditionMatcher->matches($event, $step['conditions'], $step['condition_match_type']);
     }
 
     private function actorKey(SignalEvent $event): string
@@ -287,14 +298,18 @@ final class ConversionFunnelReportService
     }
 
     /**
-     * @return list<array{label:string,event_name:string,event_category:string|null}>
+     * @return list<array{label:string,event_name:string,event_category:string|null,condition_match_type:string,conditions:array<int, array<string, mixed>>|null}>
      */
     private function resolveFunnelSteps(?SavedSignalReport $savedReport): array
     {
         $steps = SavedSignalReportDefinition::funnelSteps($savedReport?->normalizedSettings());
 
         if ($steps !== []) {
-            return $steps;
+            $resolvedSteps = $this->resolveConfiguredSteps($steps, $savedReport?->tracked_property_id);
+
+            if ($resolvedSteps !== []) {
+                return $resolvedSteps;
+            }
         }
 
         $configuredSteps = config('signals.defaults.starter_funnel', []);
@@ -330,6 +345,8 @@ final class ConversionFunnelReportService
                 'event_category' => is_string($eventCategory) && $eventCategory !== ''
                     ? $eventCategory
                     : null,
+                'condition_match_type' => 'all',
+                'conditions' => null,
             ];
         }
 
@@ -341,7 +358,7 @@ final class ConversionFunnelReportService
     }
 
     /**
-     * @return list<array{label:string,event_name:string,event_category:string|null}>
+     * @return list<array{label:string,event_name:string,event_category:string|null,condition_match_type:string,conditions:array<int, array<string, mixed>>|null}>
      */
     private function defaultFunnelSteps(): array
     {
@@ -350,18 +367,103 @@ final class ConversionFunnelReportService
                 'label' => 'Visited',
                 'event_name' => (string) config('signals.defaults.page_view_event_name', 'page_view'),
                 'event_category' => 'page_view',
+                'condition_match_type' => 'all',
+                'conditions' => null,
             ],
             [
                 'label' => 'Explored Further',
                 'event_name' => (string) config('signals.defaults.page_view_event_name', 'page_view'),
                 'event_category' => 'page_view',
+                'condition_match_type' => 'all',
+                'conditions' => null,
             ],
             [
                 'label' => 'Completed Outcome',
                 'event_name' => (string) config('signals.defaults.primary_outcome_event_name', 'conversion.completed'),
                 'event_category' => null,
+                'condition_match_type' => 'all',
+                'conditions' => null,
             ],
         ];
+    }
+
+    /**
+     * @param  list<array{label:string,step_type:string,event_name:string|null,event_category:string|null,goal_slug:string|null,route_name:string|null,condition_match_type:string,conditions:array<int, array<string, mixed>>|null}>  $steps
+     * @return list<array{label:string,event_name:string,event_category:string|null,condition_match_type:string,conditions:array<int, array<string, mixed>>|null}>
+     */
+    private function resolveConfiguredSteps(array $steps, ?string $trackedPropertyId): array
+    {
+        $goalSlugs = array_values(array_unique(array_filter(array_map(
+            static fn (array $step): ?string => $step['goal_slug'],
+            $steps,
+        ))));
+
+        $goalsBySlug = SignalGoal::query()
+            ->where('is_active', true)
+            ->when(
+                filled($trackedPropertyId),
+                fn (Builder $query): Builder => $query->where(function (Builder $goalQuery) use ($trackedPropertyId): void {
+                    $goalQuery->where('tracked_property_id', $trackedPropertyId)
+                        ->orWhereNull('tracked_property_id');
+                }),
+            )
+            ->when(
+                $goalSlugs !== [],
+                fn (Builder $query): Builder => $query->whereIn('slug', $goalSlugs)
+            )
+            ->get()
+            ->keyBy('slug');
+
+        $resolved = [];
+
+        foreach ($steps as $step) {
+            $goal = $step['goal_slug'] !== null ? $goalsBySlug->get($step['goal_slug']) : null;
+
+            if ($goal instanceof SignalGoal) {
+                $resolved[] = [
+                    'label' => $step['label'],
+                    'event_name' => $goal->event_name,
+                    'event_category' => $goal->event_category,
+                    'condition_match_type' => 'all',
+                    'conditions' => $goal->conditions,
+                ];
+
+                continue;
+            }
+
+            if ($step['route_name'] !== null) {
+                $routeCondition = app(SignalRouteCatalog::class)->conditionForRouteName($step['route_name']);
+
+                if ($routeCondition !== null) {
+                    $routeConditions = $step['conditions'] ?? [];
+                    array_unshift($routeConditions, $routeCondition);
+
+                    $resolved[] = [
+                        'label' => $step['label'],
+                        'event_name' => (string) config('signals.defaults.page_view_event_name', 'page_view'),
+                        'event_category' => 'page_view',
+                        'condition_match_type' => $step['condition_match_type'],
+                        'conditions' => $routeConditions,
+                    ];
+                }
+
+                continue;
+            }
+
+            if ($step['event_name'] === null) {
+                continue;
+            }
+
+            $resolved[] = [
+                'label' => $step['label'],
+                'event_name' => $step['event_name'],
+                'event_category' => $step['event_category'],
+                'condition_match_type' => $step['condition_match_type'],
+                'conditions' => $step['conditions'],
+            ];
+        }
+
+        return $resolved;
     }
 
     /**

@@ -10,11 +10,17 @@ The `aiarmada/signals` package is the analytics foundation for commerce packages
 
 - Event ingestion endpoints for identity, page views, and custom events
 - Session stitching and attribution dimensions (UTM/source/referrer/device)
+- Automatic device, browser, OS, bot, and IP enrichment from request metadata
+- Optional authenticated-user linkage during identity capture
+- Optional browser geolocation capture with reverse-geocoded location enrichment
 - Daily metrics aggregation for dashboard and trend reporting
 - Saved reports, goals, segments, and alert rules
 - Built-in tracker script endpoint for browser page-view capture
+- Configurable monetary analytics so outcome-only installs can hide revenue-focused behavior
 - Owner-aware multi-tenancy via `commerce-support`
 - Automatic integration listeners for cart, checkout, orders, vouchers, and affiliates
+
+Reverse geocoding uses a pipeline-based resolver. When enabled out of the box, the package registers the built-in Nominatim geocoder and will also honor any app-bound custom location resolver.
 
 ## Integrations
 
