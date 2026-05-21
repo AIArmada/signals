@@ -29,6 +29,7 @@ use RuntimeException;
  * @property string|null $message
  * @property array<string, mixed>|null $context
  * @property array<int, string>|null $channels_notified
+ * @property array<string, mixed>|null $delivery_results
  * @property bool $is_read
  * @property Carbon|null $read_at
  * @property-read SignalAlertRule $alertRule
@@ -41,7 +42,7 @@ final class SignalAlertLog extends Model
     use HasOwnerScopeConfig;
     use HasUuids;
 
-    protected static string $ownerScopeConfigKey = 'signals.features.owner';
+    protected static string $ownerScopeConfigKey = 'signals.owner';
 
     /** @var list<string> */
     protected $fillable = [
@@ -56,6 +57,7 @@ final class SignalAlertLog extends Model
         'message',
         'context',
         'channels_notified',
+        'delivery_results',
         'is_read',
         'read_at',
         'owner_type',
@@ -116,9 +118,10 @@ final class SignalAlertLog extends Model
 
             $owner = OwnerContext::resolve();
 
-            if ($owner === null) {
-                throw new RuntimeException('Owner scoping is enabled but no owner was resolved while saving a signal alert log.');
-            }
+            OwnerContext::assertResolvedOrExplicitGlobal(
+                $owner,
+                'Owner scoping is enabled but no owner was resolved while saving a signal alert log.',
+            );
 
             $ruleExists = SignalAlertRule::query()
                 ->forOwner($owner, includeGlobal: false)
@@ -152,6 +155,7 @@ final class SignalAlertLog extends Model
             'threshold_value' => 'float',
             'context' => 'array',
             'channels_notified' => 'array',
+            'delivery_results' => 'array',
             'is_read' => 'boolean',
             'read_at' => 'datetime',
         ];

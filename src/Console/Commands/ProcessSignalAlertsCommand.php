@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace AIArmada\Signals\Console\Commands;
 
 use AIArmada\CommerceSupport\Support\OwnerContext;
+use AIArmada\CommerceSupport\Support\OwnerTuple\OwnerTupleColumns;
+use AIArmada\CommerceSupport\Support\OwnerTuple\OwnerTupleParser;
 use AIArmada\Signals\Models\SignalAlertRule;
 use AIArmada\Signals\Services\SignalAlertDispatcher;
 use AIArmada\Signals\Services\SignalAlertEvaluator;
 use Illuminate\Console\Command;
-use Illuminate\Database\Eloquent\Model;
 
 final class ProcessSignalAlertsCommand extends Command
 {
@@ -60,8 +61,11 @@ final class ProcessSignalAlertsCommand extends Command
 
         $totals = ['processed' => 0, 'skipped' => 0, 'dispatched' => 0];
 
+        $columns = OwnerTupleColumns::forModelClass(SignalAlertRule::class);
+
         foreach ($owners as $row) {
-            $owner = $this->resolveOwnerFromRow($row);
+            $tuple = OwnerTupleParser::fromRow($row, $columns);
+            $owner = $tuple->toOwnerModel();
 
             $result = OwnerContext::withOwner(
                 $owner,
@@ -120,16 +124,5 @@ final class ProcessSignalAlertsCommand extends Command
         }
 
         return ['processed' => $processed, 'skipped' => $skipped, 'dispatched' => $dispatched];
-    }
-
-    private function resolveOwnerFromRow(object $row): ?Model
-    {
-        $ownerType = $row->owner_type ?? null;
-        $ownerId = $row->owner_id ?? null;
-
-        return OwnerContext::fromTypeAndId(
-            is_string($ownerType) ? $ownerType : null,
-            is_string($ownerId) || is_int($ownerId) ? $ownerId : null,
-        );
     }
 }

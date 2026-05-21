@@ -11,7 +11,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create(config('signals.database.tables.segments', 'signal_segments'), function (Blueprint $table): void {
-            $jsonColumnType = config('signals.database.json_column_type', 'json');
+            $jsonColumnType = config('signals.database.json_column_type', commerce_json_column_type('signals', 'json'));
 
             $table->uuid('id')->primary();
             $table->nullableUuidMorphs('owner');

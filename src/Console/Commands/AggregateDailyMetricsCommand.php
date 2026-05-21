@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace AIArmada\Signals\Console\Commands;
 
 use AIArmada\CommerceSupport\Support\OwnerContext;
+use AIArmada\CommerceSupport\Support\OwnerTuple\OwnerTupleColumns;
+use AIArmada\CommerceSupport\Support\OwnerTuple\OwnerTupleParser;
 use AIArmada\Signals\Models\TrackedProperty;
 use AIArmada\Signals\Services\SignalMetricsAggregator;
 use Illuminate\Console\Command;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 final class AggregateDailyMetricsCommand extends Command
@@ -23,7 +24,7 @@ final class AggregateDailyMetricsCommand extends Command
 
     public function handle(SignalMetricsAggregator $aggregator): int
     {
-        if ((bool) config('signals.features.owner.enabled', true) && OwnerContext::resolve() === null) {
+        if ((bool) config('signals.owner.enabled', true) && OwnerContext::resolve() === null) {
             $owners = TrackedProperty::query()
                 ->withoutOwnerScope()
                 ->select(['owner_type', 'owner_id'])
@@ -36,8 +37,11 @@ final class AggregateDailyMetricsCommand extends Command
                 return self::SUCCESS;
             }
 
+            $columns = OwnerTupleColumns::forModelClass(TrackedProperty::class);
+
             foreach ($owners as $row) {
-                $owner = $this->resolveOwnerFromRow($row);
+                $tuple = OwnerTupleParser::fromRow($row, $columns);
+                $owner = $tuple->toOwnerModel();
 
                 OwnerContext::withOwner($owner, function () use ($aggregator): void {
                     $this->runAggregation($aggregator);
@@ -79,16 +83,5 @@ final class AggregateDailyMetricsCommand extends Command
         $count = $aggregator->backfill($start, $end);
 
         $this->info("Aggregated {$count} daily metric rows from {$start->toDateString()} to {$end->toDateString()}.");
-    }
-
-    private function resolveOwnerFromRow(object $row): ?Model
-    {
-        $ownerType = $row->owner_type ?? null;
-        $ownerId = $row->owner_id ?? null;
-
-        return OwnerContext::fromTypeAndId(
-            is_string($ownerType) ? $ownerType : null,
-            is_string($ownerId) || is_int($ownerId) ? $ownerId : null,
-        );
     }
 }

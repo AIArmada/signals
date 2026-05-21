@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Actions;
 
+use AIArmada\CommerceSupport\Support\OwnerContext;
+use AIArmada\Signals\Jobs\EvaluateSignalAlertsForEvent;
+use AIArmada\Signals\Models\SignalAlertRule;
 use AIArmada\Signals\Models\SignalEvent;
 use AIArmada\Signals\Models\SignalIdentity;
 use AIArmada\Signals\Models\SignalSession;
 use AIArmada\Signals\Models\TrackedProperty;
+use AIArmada\Signals\Services\SignalAlertDispatcher;
+use AIArmada\Signals\Services\SignalAlertEvaluator;
 use AIArmada\Signals\Services\SignalEventPropertyTypeInferrer;
 use AIArmada\Signals\Services\SignalsIngestionRequestValidator;
 use AIArmada\Signals\Services\SignalUserAgentParser;
@@ -34,7 +39,21 @@ final class IngestSignalEvent
         $identity = $this->resolveIdentity($trackedProperty, $payload);
         $session = $this->resolveSession($trackedProperty, $identity, $payload);
         $occurredAt = $this->resolveOccurredAt($payload);
-        $properties = is_array($payload['properties'] ?? null) ? $payload['properties'] : null;
+        $properties = $this->filterProperties(is_array($payload['properties'] ?? null) ? $payload['properties'] : null);
+        $sourceEventId = $this->stringValue($payload['source_event_id'] ?? null);
+        $idempotencyKey = $this->stringValue($payload['idempotency_key'] ?? null) ?? $sourceEventId;
+
+        if ($idempotencyKey !== null) {
+            $existing = SignalEvent::query()
+                ->withoutOwnerScope()
+                ->where('tracked_property_id', $trackedProperty->id)
+                ->where('idempotency_key', $idempotencyKey)
+                ->first();
+
+            if ($existing instanceof SignalEvent) {
+                return $existing;
+            }
+        }
 
         $event = new SignalEvent([
             'tracked_property_id' => $trackedProperty->id,
@@ -43,6 +62,8 @@ final class IngestSignalEvent
             'occurred_at' => $occurredAt,
             'event_name' => (string) $payload['event_name'],
             'event_category' => (string) ($payload['event_category'] ?? 'custom'),
+            'idempotency_key' => $idempotencyKey,
+            'source_event_id' => $sourceEventId,
             'path' => $payload['path'] ?? null,
             'url' => $payload['url'] ?? null,
             'referrer' => $payload['referrer'] ?? $session?->referrer,
@@ -58,7 +79,7 @@ final class IngestSignalEvent
         ]);
 
         $this->syncOwnerFromProperty($event, $trackedProperty);
-        $event->save();
+        $this->withTrackedPropertyOwner($trackedProperty, static fn (): bool => $event->save());
 
         if ($session instanceof SignalSession) {
             $session->exit_path = $payload['path'] ?? $session->exit_path;
@@ -66,8 +87,10 @@ final class IngestSignalEvent
             $durationMilliseconds = max(0, (int) ($session->started_at?->diffInMilliseconds($occurredAt) ?? 0));
             $session->duration_milliseconds = $durationMilliseconds;
             $session->is_bounce = ! $session->events()->whereKeyNot($event->id)->exists();
-            $session->save();
+            $this->withTrackedPropertyOwner($trackedProperty, static fn (): bool => $session->save());
         }
+
+        $this->evaluateAlertsAfterIngest($event);
 
         return $event;
     }
@@ -110,6 +133,8 @@ final class IngestSignalEvent
             'device_model' => ['nullable', 'string', 'max:100'],
             'is_bot' => ['nullable', 'boolean'],
             'properties' => ['nullable', 'array'],
+            'idempotency_key' => ['nullable', 'string', 'max:255'],
+            'source_event_id' => ['nullable', 'string', 'max:255'],
         ]);
 
         $trackedProperty = $this->requestValidator->resolveTrackedProperty($request, (string) $payload['write_key']);
@@ -219,7 +244,7 @@ final class IngestSignalEvent
         }
 
         $this->syncOwnerFromProperty($session, $trackedProperty);
-        $session->save();
+        $this->withTrackedPropertyOwner($trackedProperty, static fn (): bool => $session->save());
 
         return $session;
     }
@@ -236,12 +261,108 @@ final class IngestSignalEvent
 
     private function syncOwnerFromProperty(object $model, TrackedProperty $trackedProperty): void
     {
-        if (! $trackedProperty->hasOwner()) {
+        $model->owner_type = $trackedProperty->owner_type;
+        $model->owner_id = $trackedProperty->owner_id;
+    }
+
+    private function withTrackedPropertyOwner(TrackedProperty $trackedProperty, callable $callback): mixed
+    {
+        $owner = OwnerContext::fromTypeAndId($trackedProperty->owner_type, $trackedProperty->owner_id);
+
+        return OwnerContext::withOwner($owner, $callback);
+    }
+
+    private function evaluateAlertsAfterIngest(SignalEvent $event): void
+    {
+        if (! (bool) config('signals.features.alerts.evaluate_on_ingest.enabled', false)) {
             return;
         }
 
-        $model->owner_type = $trackedProperty->owner_type;
-        $model->owner_id = $trackedProperty->owner_id;
+        if ((bool) config('signals.features.alerts.evaluate_on_ingest.queue', true)) {
+            EvaluateSignalAlertsForEvent::dispatch(
+                signalEventId: (string) $event->getKey(),
+                ownerType: $event->owner_type,
+                ownerId: $event->owner_id,
+                ownerIsGlobal: $event->owner_type === null && $event->owner_id === null,
+            );
+
+            return;
+        }
+
+        $evaluator = app(SignalAlertEvaluator::class);
+        $dispatcher = app(SignalAlertDispatcher::class);
+        $owner = OwnerContext::fromTypeAndId($event->owner_type, $event->owner_id);
+
+        OwnerContext::withOwner($owner, function () use ($event, $evaluator, $dispatcher): void {
+            SignalAlertRule::query()
+                ->where('is_active', true)
+                ->where(function ($query) use ($event): void {
+                    $query->whereNull('tracked_property_id')
+                        ->orWhere('tracked_property_id', $event->tracked_property_id);
+                })
+                ->orderByDesc('priority')
+                ->each(function (SignalAlertRule $rule) use ($evaluator, $dispatcher): void {
+                    if ($rule->isInCooldown()) {
+                        return;
+                    }
+
+                    $result = $evaluator->evaluate($rule);
+
+                    if (! $result['matched']) {
+                        return;
+                    }
+
+                    $dispatcher->dispatch($rule, $result['metric_value'], $result['context']);
+                });
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $properties
+     * @return array<string, mixed>|null
+     */
+    private function filterProperties(?array $properties): ?array
+    {
+        if ($properties === null) {
+            return null;
+        }
+
+        $allowlist = config('signals.features.privacy.property_allowlist', []);
+        $allowedKeys = is_array($allowlist) ? array_values(array_filter($allowlist, 'is_string')) : [];
+
+        if (in_array('*', $allowedKeys, true)) {
+            return $properties;
+        }
+
+        $blockedKeys = [
+            'email',
+            'phone',
+            'name',
+            'first_name',
+            'last_name',
+            'customer_email',
+            'customer_phone',
+            'customer_name',
+            'metadata',
+            'cart_metadata',
+        ];
+
+        return array_filter(
+            $properties,
+            static fn (mixed $value, string $key): bool => in_array($key, $allowedKeys, true)
+                && ! in_array($key, $blockedKeys, true)
+                && (is_scalar($value) || is_array($value) || $value === null),
+            ARRAY_FILTER_USE_BOTH,
+        ) ?: null;
+    }
+
+    private function stringValue(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return is_scalar($value) ? (string) $value : null;
     }
 
     private function resolveCountry(?Request $request, array $payload): ?string

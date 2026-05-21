@@ -4,45 +4,42 @@ title: Reporting And Alerts
 
 # Reporting And Alerts
 
-## Core Reporting Services
+Signals owns generic analytics and alerting for the Commerce packages.
 
-The package exposes service classes for report pages and saved reports:
+## Alert lifecycle
 
-- `SignalsDashboardService`
-- `PageViewReportService`
-- `ConversionFunnelReportService`
-- `AcquisitionReportService`
-- `JourneyReportService`
-- `RetentionReportService`
-- `ContentPerformanceReportService`
-- `LiveActivityReportService`
-- `GoalsReportService`
+1. `SignalEvent` records event name, category, owner, tracked property, revenue, and allowlisted properties.
+2. `SignalAlertRule` defines metric, operator, threshold, timeframe, cooldown, event filters, channels, and destination keys.
+3. `SignalAlertEvaluator` evaluates the rule against matching events.
+4. `SignalAlertDispatcher` writes `SignalAlertLog` records and dispatches configured channels.
+5. `signals:process-alerts` runs scheduled evaluation.
 
-These services work on top of `SignalEvent`, `SignalSession`, and `SignalDailyMetric`.
+## Generic filters
 
-## Saved Reports
+Alert rules can filter by:
 
-`SavedSignalReport` stores reusable report definitions (filters, dimensions, and report-specific settings).
+- event names,
+- event categories,
+- tracked property,
+- event property conditions.
 
-Typical use cases:
+This is intentionally package-agnostic: cart, checkout, orders, vouchers, affiliates, and future packages can all use the same rule engine.
 
-- Save commonly used date ranges and tracked property filters
-- Persist funnel or journey breakdown settings
-- Share report definitions across admin users
+## Channels
 
-## Goals and Segments
+Supported dispatch channels:
 
-- `SignalGoal` defines measurable outcomes
-- `SignalSegment` defines audience filters
-- Segment/report helpers are implemented in services such as `SignalSegmentReportFilter`
+- database,
+- email,
+- webhook,
+- Slack-compatible webhook.
 
-## Alert Lifecycle
+Named destinations from config are preferred. Inline destinations are ignored unless explicitly enabled.
 
-1. `SignalAlertRule` defines metric, condition, threshold, and cooldown.
-2. `SignalAlertEvaluator` checks current metric values.
-3. `SignalAlertDispatcher` writes `SignalAlertLog` records and dispatches notifications.
-4. `signals:process-alerts` orchestrates evaluation/dispatch.
+## Idempotency
 
-## Owner Scoping
+`SignalEvent` supports an idempotency/source-event key unique per tracked property. Use it for listener retries and backfills.
 
-When owner mode is enabled, report queries and command execution are scoped per owner context.
+## Owner scoping
+
+Report, alert, and command paths are owner-scoped. Global rows require explicit global context for mutation.

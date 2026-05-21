@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Actions;
 
+use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\Signals\Models\SignalIdentity;
 use AIArmada\Signals\Models\TrackedProperty;
 use AIArmada\Signals\Services\SignalsIngestionRequestValidator;
@@ -49,7 +50,9 @@ final class IdentifySignalIdentity
         }
 
         $this->syncOwnerFromProperty($identity, $trackedProperty);
-        $identity->save();
+        $owner = OwnerContext::fromTypeAndId($trackedProperty->owner_type, $trackedProperty->owner_id);
+
+        OwnerContext::withOwner($owner, static fn (): bool => $identity->save());
 
         return $identity;
     }

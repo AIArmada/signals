@@ -38,7 +38,7 @@ final class SignalIdentity extends Model
     use HasOwnerScopeConfig;
     use HasUuids;
 
-    protected static string $ownerScopeConfigKey = 'signals.features.owner';
+    protected static string $ownerScopeConfigKey = 'signals.owner';
 
     /** @var list<string> */
     protected $fillable = [

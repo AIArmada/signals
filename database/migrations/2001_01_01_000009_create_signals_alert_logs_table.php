@@ -11,7 +11,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create(config('signals.database.tables.alert_logs', 'signal_alert_logs'), function (Blueprint $table): void {
-            $jsonColumnType = config('signals.database.json_column_type', 'json');
+            $jsonColumnType = config('signals.database.json_column_type', commerce_json_column_type('signals', 'json'));
 
             $table->uuid('id')->primary();
             $table->nullableUuidMorphs('owner');
@@ -26,6 +26,7 @@ return new class extends Migration
             $table->text('message')->nullable();
             $table->{$jsonColumnType}('context')->nullable();
             $table->{$jsonColumnType}('channels_notified')->nullable();
+            $table->{$jsonColumnType}('delivery_results')->nullable();
             $table->boolean('is_read')->default(false);
             $table->timestamp('read_at')->nullable();
             $table->timestamps();

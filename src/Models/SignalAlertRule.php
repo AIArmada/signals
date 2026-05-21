@@ -7,6 +7,7 @@ namespace AIArmada\Signals\Models;
 use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
+use AIArmada\CommerceSupport\Traits\HasOwnerScopeKey;
 use AIArmada\Signals\Models\Concerns\AutoAssignsSignalOwnerOnCreate;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -20,6 +21,7 @@ use RuntimeException;
  * @property string $id
  * @property string|null $owner_type
  * @property string|null $owner_id
+ * @property string $owner_scope
  * @property string|null $tracked_property_id
  * @property string $name
  * @property string $slug
@@ -27,6 +29,10 @@ use RuntimeException;
  * @property string $metric_key
  * @property string $operator
  * @property float $threshold
+ * @property array<string, mixed>|null $event_filters
+ * @property array<int, string>|null $channels
+ * @property array<int, string>|null $destination_keys
+ * @property array<string, mixed>|null $inline_destinations
  * @property int $timeframe_minutes
  * @property int $cooldown_minutes
  * @property string $severity
@@ -41,9 +47,15 @@ final class SignalAlertRule extends Model
     use AutoAssignsSignalOwnerOnCreate;
     use HasOwner;
     use HasOwnerScopeConfig;
+    use HasOwnerScopeKey;
     use HasUuids;
 
-    protected static string $ownerScopeConfigKey = 'signals.features.owner';
+    protected static string $ownerScopeConfigKey = 'signals.owner';
+
+    /** @var list<string> */
+    protected $hidden = [
+        'owner_scope',
+    ];
 
     /** @var list<string> */
     protected $fillable = [
@@ -54,6 +66,10 @@ final class SignalAlertRule extends Model
         'metric_key',
         'operator',
         'threshold',
+        'event_filters',
+        'channels',
+        'destination_keys',
+        'inline_destinations',
         'timeframe_minutes',
         'cooldown_minutes',
         'severity',
@@ -125,9 +141,10 @@ final class SignalAlertRule extends Model
 
             $owner = OwnerContext::resolve();
 
-            if ($owner === null) {
-                throw new RuntimeException('Owner scoping is enabled but no owner was resolved while saving a signal alert rule.');
-            }
+            OwnerContext::assertResolvedOrExplicitGlobal(
+                $owner,
+                'Owner scoping is enabled but no owner was resolved while saving a signal alert rule.',
+            );
 
             if ($rule->tracked_property_id !== '' && $rule->tracked_property_id !== null) {
                 $exists = TrackedProperty::query()
@@ -153,6 +170,10 @@ final class SignalAlertRule extends Model
     {
         return [
             'threshold' => 'float',
+            'event_filters' => 'array',
+            'channels' => 'array',
+            'destination_keys' => 'array',
+            'inline_destinations' => 'array',
             'timeframe_minutes' => 'integer',
             'cooldown_minutes' => 'integer',
             'priority' => 'integer',

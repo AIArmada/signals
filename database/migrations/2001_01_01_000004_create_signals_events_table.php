@@ -11,7 +11,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create(config('signals.database.tables.events', 'signal_events'), function (Blueprint $table): void {
-            $jsonColumnType = config('signals.database.json_column_type', 'json');
+            $jsonColumnType = config('signals.database.json_column_type', commerce_json_column_type('signals', 'json'));
 
             $table->uuid('id')->primary();
             $table->foreignUuid('tracked_property_id');
@@ -21,6 +21,8 @@ return new class extends Migration
             $table->timestamp('occurred_at');
             $table->string('event_name');
             $table->string('event_category')->default('custom');
+            $table->string('idempotency_key')->nullable();
+            $table->string('source_event_id')->nullable();
             $table->string('path')->nullable();
             $table->text('url')->nullable();
             $table->text('referrer')->nullable();
@@ -37,6 +39,8 @@ return new class extends Migration
             $table->index(['tracked_property_id', 'occurred_at']);
             $table->index(['event_category', 'occurred_at']);
             $table->index(['event_name', 'occurred_at']);
+            $table->unique(['tracked_property_id', 'idempotency_key']);
+            $table->index(['tracked_property_id', 'source_event_id']);
             $table->index(['source', 'campaign']);
         });
     }

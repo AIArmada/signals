@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable $occurred_at
  * @property string $event_name
  * @property string $event_category
+ * @property string|null $idempotency_key
+ * @property string|null $source_event_id
  * @property string|null $path
  * @property string|null $url
  * @property string|null $referrer
@@ -45,7 +47,7 @@ final class SignalEvent extends Model
     use HasOwnerScopeConfig;
     use HasUuids;
 
-    protected static string $ownerScopeConfigKey = 'signals.features.owner';
+    protected static string $ownerScopeConfigKey = 'signals.owner';
 
     /** @var list<string> */
     protected $fillable = [
@@ -55,6 +57,8 @@ final class SignalEvent extends Model
         'occurred_at',
         'event_name',
         'event_category',
+        'idempotency_key',
+        'source_event_id',
         'path',
         'url',
         'referrer',

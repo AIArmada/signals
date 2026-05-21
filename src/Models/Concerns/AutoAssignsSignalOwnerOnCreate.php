@@ -41,7 +41,7 @@ trait AutoAssignsSignalOwnerOnCreate
 
     private static function signalOwnerScopingEnabled(): bool
     {
-        return (bool) config('signals.features.owner.enabled', true);
+        return (bool) config('signals.owner.enabled', true);
     }
 
     private static function assertSignalOwnerColumnsAreValid(Model $model): void
@@ -58,7 +58,7 @@ trait AutoAssignsSignalOwnerOnCreate
 
     private static function assignSignalOwnerFromContext(Model $model): void
     {
-        if (! (bool) config('signals.features.owner.auto_assign_on_create', true)) {
+        if (! (bool) config('signals.owner.auto_assign_on_create', true)) {
             return;
         }
 

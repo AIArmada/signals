@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Actions;
 
+use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\Signals\Jobs\ReverseGeocodeSessionJob;
 use AIArmada\Signals\Models\SignalSession;
-use AIArmada\Signals\Services\SignalLocationResolverPipeline;
+use AIArmada\Signals\Models\TrackedProperty;
 use AIArmada\Signals\Services\SignalsIngestionRequestValidator;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -27,7 +28,7 @@ final class CaptureSignalGeolocation
      *
      * @param  array<string, mixed>  $payload
      */
-    public function handle(array $payload, ?string $trackedPropertyId = null): void
+    public function handle(array $payload, TrackedProperty $trackedProperty): void
     {
         if (! (bool) config('signals.features.geolocation.enabled', true)) {
             return;
@@ -46,44 +47,54 @@ final class CaptureSignalGeolocation
             return;
         }
 
-        $query = SignalSession::where('session_identifier', $sessionIdentifier);
+        $owner = OwnerContext::fromTypeAndId($trackedProperty->owner_type, $trackedProperty->owner_id);
 
-        if ($trackedPropertyId !== null) {
-            $query->where('tracked_property_id', $trackedPropertyId);
-        }
+        OwnerContext::withOwner($owner, function () use ($sessionIdentifier, $trackedProperty, $payload, $latitude, $longitude): void {
+            $session = SignalSession::query()
+                ->where('session_identifier', $sessionIdentifier)
+                ->where('tracked_property_id', $trackedProperty->id)
+                ->first();
 
-        $session = $query->first();
-
-        if ($session === null) {
-            return;
-        }
-
-        if ($session->latitude !== null && $session->longitude !== null) {
-            return;
-        }
-
-        $accuracy = is_numeric($payload['accuracy'] ?? null)
-            ? (int) round((float) $payload['accuracy'])
-            : null;
-
-        $session->update([
-            'latitude' => (float) $latitude,
-            'longitude' => (float) $longitude,
-            'accuracy_meters' => $accuracy,
-            'geolocation_source' => 'browser',
-            'geolocation_captured_at' => CarbonImmutable::now(),
-        ]);
-
-        if ((bool) config('signals.features.geolocation.reverse_geocode.enabled', false)) {
-            $async = (bool) config('signals.features.geolocation.reverse_geocode.async', true);
-
-            if ($async) {
-                dispatch(new ReverseGeocodeSessionJob($session->id))->afterCommit();
-            } else {
-                app(ReverseGeocodeSessionJob::class, ['sessionId' => $session->id])
-                    ->handle(app(SignalLocationResolverPipeline::class));
+            if ($session === null) {
+                return;
             }
-        }
+
+            if ($session->latitude !== null && $session->longitude !== null) {
+                return;
+            }
+
+            $accuracy = is_numeric($payload['accuracy'] ?? null)
+                ? (int) round((float) $payload['accuracy'])
+                : null;
+
+            $session->update([
+                'latitude' => (float) $latitude,
+                'longitude' => (float) $longitude,
+                'accuracy_meters' => $accuracy,
+                'geolocation_source' => 'browser',
+                'geolocation_captured_at' => CarbonImmutable::now(),
+            ]);
+
+            if (! (bool) config('signals.features.geolocation.reverse_geocode.enabled', false)) {
+                return;
+            }
+
+            $ownerIsGlobal = $trackedProperty->owner_type === null && $trackedProperty->owner_id === null;
+            $job = new ReverseGeocodeSessionJob(
+                sessionId: $session->id,
+                ownerType: $trackedProperty->owner_type,
+                ownerId: $trackedProperty->owner_id,
+                ownerIsGlobal: $ownerIsGlobal,
+            );
+
+            if ((bool) config('signals.features.geolocation.reverse_geocode.async', true)) {
+                dispatch($job)->afterCommit();
+
+                return;
+            }
+
+            $job->handle();
+        });
     }
 
     public function asController(Request $request): JsonResponse
@@ -99,7 +110,7 @@ final class CaptureSignalGeolocation
         // Validate write key resolves to a tracked property (raises 403 on failure)
         $trackedProperty = $this->requestValidator->resolveTrackedProperty($request, (string) $payload['write_key']);
 
-        $this->handle($payload, $trackedProperty->id);
+        $this->handle($payload, $trackedProperty);
 
         return response()->json(['status' => 'ok'], 202);
     }

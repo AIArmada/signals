@@ -16,7 +16,7 @@ return new class extends Migration
             return;
         }
 
-        $jsonColumnType = config('signals.database.json_column_type', 'json');
+        $jsonColumnType = config('signals.database.json_column_type', commerce_json_column_type('signals', 'json'));
 
         Schema::table($tableName, function (Blueprint $table) use ($jsonColumnType): void {
             if (! Schema::hasColumn($table->getTable(), 'country_source')) {
