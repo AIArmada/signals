@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Services;
 
+use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\Signals\Models\SignalAlertLog;
 use AIArmada\Signals\Models\SignalAlertRule;
 use AIArmada\Signals\Models\SignalDailyMetric;
@@ -18,35 +19,37 @@ final class SignalsDashboardService
      */
     public function summary(?TrackedProperty $trackedProperty = null, ?CarbonImmutable $startAt = null, ?CarbonImmutable $endAt = null): array
     {
-        [$startAt, $endAt] = $this->resolvePeriod($startAt, $endAt);
+        return $this->withResolvedOwnerOrExplicitGlobal(function () use ($trackedProperty, $startAt, $endAt): array {
+            [$startAt, $endAt] = $this->resolvePeriod($startAt, $endAt);
 
-        $trackedProperties = TrackedProperty::query();
-        $identities = SignalIdentity::query();
-        $dailyMetrics = SignalDailyMetric::query()->whereBetween('date', [$startAt->toDateString(), $endAt->toDateString()]);
-        $alertRules = SignalAlertRule::query()->where('is_active', true);
-        $alertLogs = SignalAlertLog::query()
-            ->where('is_read', false);
+            $trackedProperties = TrackedProperty::query();
+            $identities = SignalIdentity::query();
+            $dailyMetrics = SignalDailyMetric::query()->whereBetween('date', [$startAt->toDateString(), $endAt->toDateString()]);
+            $alertRules = SignalAlertRule::query()->where('is_active', true);
+            $alertLogs = SignalAlertLog::query()
+                ->where('is_read', false);
 
-        if ($trackedProperty instanceof TrackedProperty) {
-            $trackedProperties->whereKey($trackedProperty->getKey());
-            $identities->where('tracked_property_id', $trackedProperty->id);
-            $dailyMetrics->where('tracked_property_id', $trackedProperty->id);
-            $alertRules->where('tracked_property_id', $trackedProperty->id);
-            $alertLogs->where('tracked_property_id', $trackedProperty->id);
-        }
+            if ($trackedProperty instanceof TrackedProperty) {
+                $trackedProperties->whereKey($trackedProperty->getKey());
+                $identities->where('tracked_property_id', $trackedProperty->id);
+                $dailyMetrics->where('tracked_property_id', $trackedProperty->id);
+                $alertRules->where('tracked_property_id', $trackedProperty->id);
+                $alertLogs->where('tracked_property_id', $trackedProperty->id);
+            }
 
-        $identities->whereBetween('last_seen_at', [$startAt, $endAt]);
+            $identities->whereBetween('last_seen_at', [$startAt, $endAt]);
 
-        return [
-            'tracked_properties' => $trackedProperties->count(),
-            'identities' => $identities->count(),
-            'sessions' => (int) ((clone $dailyMetrics)->sum('sessions')),
-            'events' => (int) ((clone $dailyMetrics)->sum('events')),
-            'conversions' => (int) ((clone $dailyMetrics)->sum('conversions')),
-            'revenue_minor' => (int) ((clone $dailyMetrics)->sum('revenue_minor')),
-            'active_alert_rules' => $alertRules->count(),
-            'unread_alerts' => $alertLogs->count(),
-        ];
+            return [
+                'tracked_properties' => $trackedProperties->count(),
+                'identities' => $identities->count(),
+                'sessions' => (int) ((clone $dailyMetrics)->sum('sessions')),
+                'events' => (int) ((clone $dailyMetrics)->sum('events')),
+                'conversions' => (int) ((clone $dailyMetrics)->sum('conversions')),
+                'revenue_minor' => (int) ((clone $dailyMetrics)->sum('revenue_minor')),
+                'active_alert_rules' => $alertRules->count(),
+                'unread_alerts' => $alertLogs->count(),
+            ];
+        });
     }
 
     /**
@@ -54,34 +57,45 @@ final class SignalsDashboardService
      */
     public function trend(?TrackedProperty $trackedProperty = null, ?CarbonImmutable $startAt = null, ?CarbonImmutable $endAt = null): array
     {
-        [$startAt, $endAt] = $this->resolvePeriod($startAt, $endAt);
+        return $this->withResolvedOwnerOrExplicitGlobal(function () use ($trackedProperty, $startAt, $endAt): array {
+            [$startAt, $endAt] = $this->resolvePeriod($startAt, $endAt);
 
-        $query = SignalDailyMetric::query()
-            ->whereBetween('date', [$startAt->toDateString(), $endAt->toDateString()])
-            ->selectRaw('date as period')
-            ->selectRaw('SUM(events) as events')
-            ->selectRaw('SUM(conversions) as conversions')
-            ->selectRaw('SUM(revenue_minor) as revenue_minor')
-            ->groupBy('date')
-            ->orderBy('date');
+            $query = SignalDailyMetric::query()
+                ->whereBetween('date', [$startAt->toDateString(), $endAt->toDateString()])
+                ->selectRaw('date as period')
+                ->selectRaw('SUM(events) as events')
+                ->selectRaw('SUM(conversions) as conversions')
+                ->selectRaw('SUM(revenue_minor) as revenue_minor')
+                ->groupBy('date')
+                ->orderBy('date');
 
-        if ($trackedProperty instanceof TrackedProperty) {
-            $query->where('tracked_property_id', $trackedProperty->id);
+            if ($trackedProperty instanceof TrackedProperty) {
+                $query->where('tracked_property_id', $trackedProperty->id);
+            }
+
+            $rows = $query->get();
+
+            return $rows
+                ->map(static function ($row): array {
+                    return [
+                        'date' => (string) $row->getAttribute('period'),
+                        'events' => (int) $row->getAttribute('events'),
+                        'conversions' => (int) $row->getAttribute('conversions'),
+                        'revenue_minor' => (int) $row->getAttribute('revenue_minor'),
+                    ];
+                })
+                ->values()
+                ->all();
+        });
+    }
+
+    private function withResolvedOwnerOrExplicitGlobal(callable $callback): mixed
+    {
+        if (OwnerContext::resolve() !== null || OwnerContext::isExplicitGlobal()) {
+            return $callback();
         }
 
-        $rows = $query->get();
-
-        return $rows
-            ->map(static function ($row): array {
-                return [
-                    'date' => (string) $row->getAttribute('period'),
-                    'events' => (int) $row->getAttribute('events'),
-                    'conversions' => (int) $row->getAttribute('conversions'),
-                    'revenue_minor' => (int) $row->getAttribute('revenue_minor'),
-                ];
-            })
-            ->values()
-            ->all();
+        return OwnerContext::withOwner(null, static fn (): mixed => $callback());
     }
 
     /**
