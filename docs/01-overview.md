@@ -11,9 +11,9 @@ The `aiarmada/signals` package is the analytics foundation for Commerce. It owns
 ## What this package owns
 
 - Tracked events, identities, sessions, daily metrics, reports, goals, segments, and alert rules
-- Event ingestion endpoints and the browser tracker script endpoint
+- Event ingestion endpoints, browser context bootstrapping, and the tracker script endpoint
 - Request metadata enrichment, session stitching, attribution dimensions, and device or bot analysis
-- Reporting, alerting, and cross-package analytics listeners
+- Reporting, alerting, route-aware filter helpers, and cross-package analytics listeners
 
 ## What this package does not own
 
@@ -30,8 +30,9 @@ The `aiarmada/signals` package is the analytics foundation for Commerce. It owns
 
 ## Main models services or surfaces
 
-- **Ingestion surface** — HTTP actions for identity, page-view, and custom-event capture plus tracker-script delivery
-- **Models and services** — signals domain models, reporting, dashboards, alerting, ingestion helpers, and daily aggregation
+- **Ingestion surface** — HTTP actions for identity, page-view, custom-event capture, geolocation capture, and tracker-script delivery
+- **Browser surface** — browser-context cookies, optional automatic tracker injection, and Blade `@signalsTracker` rendering
+- **Models and services** — signals domain models, reporting, dashboards, alerting, ingestion helpers, route catalogs, and daily aggregation
 - **Integration surface** — package listeners and registrar hooks for cart, checkout, orders, vouchers, and affiliates
 
 ## Owner scoping and security notes
@@ -49,9 +50,12 @@ The `aiarmada/signals` package is the analytics foundation for commerce packages
 - Automatic device, browser, OS, bot, and IP enrichment from request metadata
 - Optional authenticated-user linkage during identity capture
 - Optional browser geolocation capture with reverse-geocoded location enrichment
+- Browser integration with `sig_vid` and `sig_sid` cookies, optional middleware auto-registration, and automatic HTML tracker injection
+- Blade `@signalsTracker(...)` helper for explicit tracker placement and per-page overrides
 - Daily metrics aggregation for dashboard and trend reporting
-- Saved reports, goals, segments, and alert rules
-- Built-in tracker script endpoint for browser page-view capture
+- Dedicated report services for page views, funnels, acquisition, journeys, retention, content performance, goals, live activity, and devices
+- Saved reports, goals, segments, route-aware filter helpers, and alert rules
+- Built-in tracker script endpoint for browser page-view and SPA navigation capture
 - Configurable monetary analytics so outcome-only installs can hide revenue-focused behavior
 - Owner-aware multi-tenancy via `commerce-support`
 - Automatic integration listeners for cart, checkout, orders, vouchers, and affiliates
@@ -67,6 +71,8 @@ The package registers listeners only when related packages/events exist:
 - Orders: paid
 - Vouchers: applied, removed
 - Affiliates: attributed, conversion recorded
+
+When browser integration is enabled, Signals can also auto-create a browser tracked property per owner/global context and inject tracker markup into successful HTML responses.
 
 ## Package Structure
 

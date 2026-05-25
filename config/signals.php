@@ -169,6 +169,34 @@ return [
 
     /* Integrations */
     'integrations' => [
+        'browser' => [
+            'enabled' => false,
+            'auto_register_middleware' => true,
+            'middleware_group' => 'web',
+            'auto_inject' => true,
+            'identifiers' => [
+                'visitor_cookie_name' => 'sig_vid',
+                'session_cookie_name' => 'sig_sid',
+                'visitor_cookie_ttl_seconds' => 31_536_000,
+                'session_cookie_ttl_seconds' => 1_800,
+                'path' => '/',
+                'domain' => null,
+                'secure' => null,
+                'http_only' => true,
+                'same_site' => 'lax',
+            ],
+            'tracked_property' => [
+                'auto_create' => true,
+                'slug' => 'commerce-browser',
+                'name' => 'Commerce Browser',
+            ],
+            'identify' => [
+                'enabled' => true,
+            ],
+            'geolocation' => [
+                'enabled' => true,
+            ],
+        ],
         'cart' => [
             'enabled' => false,
             'listen_for_item_added' => true,

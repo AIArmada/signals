@@ -10,11 +10,25 @@ title: Troubleshooting
 - Confirm `signals.http.prefix` and `signals.http.middleware` match your app routing.
 - Check request validation errors for required fields (`session_identifier`, `path`, `url` for page views).
 
+## The tracker is not auto-injected into HTML responses
+
+- Ensure `signals.integrations.browser.enabled` is `true`.
+- Ensure `signals.integrations.browser.auto_inject` is `true`.
+- Auto-injection only runs for successful `GET` HTML responses.
+- If your HTML already contains a `data-signals-tracker` script tag, Signals will not inject a second copy.
+
 ## Tracker Script Loads But No Data
 
 - Ensure script includes `data-write-key`.
+- If you rendered the script manually, also include `data-anonymous-id` and `data-session-id`.
 - Confirm browser can reach `GET /api/signals/tracker.js`.
 - Verify CSP rules allow loading script and posting to ingestion endpoint.
+
+## Browser cookies never appear
+
+- Ensure the `signals.browser` middleware ran for the request that rendered the page.
+- If you disabled automatic middleware registration, attach `signals.browser` manually to your web routes or middleware group.
+- Check cookie settings under `signals.integrations.browser.identifiers.*` if you are serving across subdomains or HTTPS-only environments.
 
 ## Device / Browser Fields Stay Empty
 
@@ -65,3 +79,4 @@ php artisan signals:process-alerts --dry-run
 ```
 
 - Check `is_active`, threshold values, and cooldown windows on `SignalAlertRule`.
+- If you expected alerts during ingest, confirm `signals.features.alerts.evaluate_on_ingest.enabled` is turned on.

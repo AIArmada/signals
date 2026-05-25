@@ -49,6 +49,21 @@ Table names can be overridden individually in `database.tables`. All tables defa
 
 `primary_outcome_event_name` controls which event is used for primary-outcome goal calculations. `starter_funnel` is the default funnel definition shown before the user configures a custom one.
 
+## Recording
+
+```php
+'recording' => [
+    'events' => [
+        'checkout.started' => true,
+        'checkout.completed' => true,
+        'order.paid' => true,
+        'order.refunded' => true,
+    ],
+],
+```
+
+These toggles let you suppress specific built-in commerce recordings without disabling the entire integration surface.
+
 ## Owner
 
 ```php
@@ -131,18 +146,23 @@ Geolocation capture is available but reverse geocoding is opt-in. When `async` i
     'privacy' => [
         'property_allowlist' => [
             'affiliate_code', 'affiliate_id', 'attribution_id',
+            'assignment_id',
             'cart_id', 'cart_identifier', 'cart_instance', 'cart_total_minor',
             'channel', 'checkout', 'checkout_session_id',
             'commission_minor', 'conversion_id', 'conversion_type',
             'cookie_value', 'currency', 'external_reference',
+            'experiment_contexts', 'experiment_id', 'experiment_slug',
             'first_order', 'gateway', 'item_count', 'item_id', 'item_name',
             'items_count', 'landing_url', 'line_total_minor', 'medium',
+            'module_type',
             'order_id', 'order_number', 'order_reference',
             'payment_gateway', 'quantity', 'referrer_url',
+            'refund_reason',
             'shipping_method', 'source_event_id', 'status',
             'subtotal_minor', 'subject_identifier', 'subject_instance',
             'title', 'total_minor', 'total_quantity', 'transaction_id',
             'unique_item_count', 'unit_price_minor', 'value_minor',
+            'variant_code', 'variant_id',
             'voucher_code', 'voucher_id', 'voucher_name', 'voucher_type', 'voucher_value',
         ],
     ],
@@ -150,6 +170,8 @@ Geolocation capture is available but reverse geocoding is opt-in. When `async` i
 ```
 
 Raw PII such as email, phone, names, and full metadata is excluded by default. Only the keys listed here are stored on `SignalEvent.properties`. Add operational fields that are safe to store; remove any that are sensitive for your use case.
+
+The default allowlist now includes Growth attribution keys such as `experiment_id`, `variant_id`, `assignment_id`, and `experiment_contexts`.
 
 ### Alerts
 
@@ -175,7 +197,50 @@ Scheduled alert evaluation (`signals:process-alerts`) is the baseline. On-ingest
 
 ## Integrations
 
-Each integration is independently toggled. Cart integrations default to `enabled: false`; checkout, orders, vouchers, and affiliates default to `enabled: true`.
+Each integration is independently toggled. Browser and cart integrations default to `enabled: false`; checkout, orders, vouchers, and affiliates default to `enabled: true`.
+
+### Browser
+
+```php
+'integrations' => [
+    'browser' => [
+        'enabled' => false,
+        'auto_register_middleware' => true,
+        'middleware_group' => 'web',
+        'auto_inject' => true,
+        'identifiers' => [
+            'visitor_cookie_name' => 'sig_vid',
+            'session_cookie_name' => 'sig_sid',
+            'visitor_cookie_ttl_seconds' => 31_536_000,
+            'session_cookie_ttl_seconds' => 1_800,
+            'path' => '/',
+            'domain' => null,
+            'secure' => null,
+            'http_only' => true,
+            'same_site' => 'lax',
+        ],
+        'tracked_property' => [
+            'auto_create' => true,
+            'slug' => 'commerce-browser',
+            'name' => 'Commerce Browser',
+        ],
+        'identify' => [
+            'enabled' => true,
+        ],
+        'geolocation' => [
+            'enabled' => true,
+        ],
+    ],
+],
+```
+
+Browser integration controls:
+
+- middleware bootstrapping for browser cookies and session state
+- optional automatic tracker injection into successful HTML responses
+- default cookie names and lifetimes
+- automatic tracked-property creation for browser analytics
+- whether browser identify / geolocation payloads should be emitted
 
 ### Cart
 
@@ -245,8 +310,11 @@ Each integration is independently toggled. Cart integrations default to `enabled
     'orders' => [
         'enabled'          => true,
         'listen_for_paid'  => true,
+        'listen_for_refunded' => true,
         'event_name'       => 'order.paid',
         'event_category'   => 'conversion',
+        'refund_event_name' => 'order.refunded',
+        'refund_event_category' => 'conversion',
     ],
 ],
 ```
@@ -282,7 +350,7 @@ Each integration is independently toggled. Cart integrations default to `enabled
 ],
 ```
 
-Each enabled integration can auto-create a deterministic tracked property per owner/global context when no single active property exists.
+Browser, cart, and Filament cart integrations can auto-create deterministic tracked properties per owner / global context when no active property exists.
 
 ## HTTP
 
