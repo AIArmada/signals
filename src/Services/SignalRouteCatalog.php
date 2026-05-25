@@ -53,7 +53,7 @@ final class SignalRouteCatalog
         $prefix = mb_strstr($uri, '{', true);
         $prefix = $prefix === false ? $uri : $prefix;
 
-        if ($prefix === '' || $prefix === false) {
+        if ($prefix === '') {
             $prefix = '/';
         }
 

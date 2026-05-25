@@ -20,17 +20,24 @@ final class CommerceSignalsRecorder
 
     public function recordCheckoutCompleted(Model $session): ?SignalEvent
     {
+        if (! $this->isEventRecordingEnabled('checkout.completed')) {
+            return null;
+        }
+
         $trackedProperty = $this->trackedPropertyResolver->resolveForModel($session);
 
         if ($trackedProperty === null) {
             return null;
         }
 
+        $anonymousId = $this->growthVisitorIdFromCheckoutSession($session)
+            ?? $this->stringValue($this->attributeValue($session, 'cart_id'));
+
         return $this->ingestSignalEvent->handle($trackedProperty, [
             'event_name' => (string) config('signals.integrations.checkout.event_name', 'checkout.completed'),
             'event_category' => (string) config('signals.integrations.checkout.event_category', 'checkout'),
             'external_id' => $this->stringValue($this->attributeValue($session, 'customer_id')),
-            'anonymous_id' => $this->stringValue($this->attributeValue($session, 'cart_id')),
+            'anonymous_id' => $anonymousId,
             'occurred_at' => $this->timestampValue($this->attributeValue($session, 'completed_at') ?? $this->attributeValue($session, 'updated_at')),
             'revenue_minor' => (int) ($this->attributeValue($session, 'grand_total') ?? 0),
             'currency' => $this->stringValue($this->attributeValue($session, 'currency')) ?? (string) config('signals.defaults.currency', 'MYR'),
@@ -39,23 +46,31 @@ final class CommerceSignalsRecorder
                 'cart_id' => $this->stringValue($this->attributeValue($session, 'cart_id')),
                 'order_id' => $this->stringValue($this->attributeValue($session, 'order_id')),
                 'payment_gateway' => $this->stringValue($this->attributeValue($session, 'selected_payment_gateway')),
+                'growth_visitor_id' => $anonymousId,
             ]),
         ]);
     }
 
     public function recordCheckoutStarted(Model $session): ?SignalEvent
     {
+        if (! $this->isEventRecordingEnabled('checkout.started')) {
+            return null;
+        }
+
         $trackedProperty = $this->trackedPropertyResolver->resolveForModel($session);
 
         if ($trackedProperty === null) {
             return null;
         }
 
+        $anonymousId = $this->growthVisitorIdFromCheckoutSession($session)
+            ?? $this->stringValue($this->attributeValue($session, 'cart_id'));
+
         return $this->ingestSignalEvent->handle($trackedProperty, [
             'event_name' => (string) config('signals.integrations.checkout.started_event_name', 'checkout.started'),
             'event_category' => (string) config('signals.integrations.checkout.event_category', 'checkout'),
             'external_id' => $this->stringValue($this->attributeValue($session, 'customer_id')),
-            'anonymous_id' => $this->stringValue($this->attributeValue($session, 'cart_id')),
+            'anonymous_id' => $anonymousId,
             'occurred_at' => $this->timestampValue($this->attributeValue($session, 'created_at') ?? $this->attributeValue($session, 'updated_at')),
             'revenue_minor' => (int) ($this->attributeValue($session, 'grand_total') ?? 0),
             'currency' => $this->stringValue($this->attributeValue($session, 'currency')) ?? (string) config('signals.defaults.currency', 'MYR'),
@@ -64,12 +79,17 @@ final class CommerceSignalsRecorder
                 'cart_id' => $this->stringValue($this->attributeValue($session, 'cart_id')),
                 'payment_gateway' => $this->stringValue($this->attributeValue($session, 'selected_payment_gateway')),
                 'shipping_method' => $this->stringValue($this->attributeValue($session, 'selected_shipping_method')),
+                'growth_visitor_id' => $anonymousId,
             ]),
         ]);
     }
 
     public function recordOrderPaid(Model $order, ?string $transactionId = null, ?string $gateway = null): ?SignalEvent
     {
+        if (! $this->isEventRecordingEnabled('order.paid')) {
+            return null;
+        }
+
         $trackedProperty = $this->trackedPropertyResolver->resolveForModel($order);
 
         if ($trackedProperty === null) {
@@ -78,12 +98,13 @@ final class CommerceSignalsRecorder
 
         $checkoutSessionId = $this->checkoutSessionIdForOrder($order);
         $cartId = $this->cartIdForOrder($order);
+        $anonymousId = $this->growthVisitorIdFromOrder($order) ?? $cartId;
 
         return $this->ingestSignalEvent->handle($trackedProperty, [
             'event_name' => (string) config('signals.integrations.orders.event_name', 'order.paid'),
             'event_category' => (string) config('signals.integrations.orders.event_category', 'conversion'),
             'external_id' => $this->stringValue($this->attributeValue($order, 'customer_id')),
-            'anonymous_id' => $cartId,
+            'anonymous_id' => $anonymousId,
             'occurred_at' => $this->timestampValue($this->attributeValue($order, 'paid_at') ?? $this->attributeValue($order, 'updated_at')),
             'revenue_minor' => (int) ($this->attributeValue($order, 'grand_total') ?? 0),
             'currency' => $this->stringValue($this->attributeValue($order, 'currency')) ?? (string) config('signals.defaults.currency', 'MYR'),
@@ -94,12 +115,17 @@ final class CommerceSignalsRecorder
                 'order_number' => $this->stringValue($this->attributeValue($order, 'order_number')),
                 'gateway' => $gateway,
                 'transaction_id' => $transactionId,
+                'growth_visitor_id' => $anonymousId,
             ]),
         ]);
     }
 
     public function recordOrderRefunded(Model $order, int $amount, ?string $reason = null): ?SignalEvent
     {
+        if (! $this->isEventRecordingEnabled('order.refunded')) {
+            return null;
+        }
+
         $trackedProperty = $this->trackedPropertyResolver->resolveForModel($order);
 
         if ($trackedProperty === null) {
@@ -108,12 +134,13 @@ final class CommerceSignalsRecorder
 
         $checkoutSessionId = $this->checkoutSessionIdForOrder($order);
         $cartId = $this->cartIdForOrder($order);
+        $anonymousId = $this->growthVisitorIdFromOrder($order) ?? $cartId;
 
         return $this->ingestSignalEvent->handle($trackedProperty, [
             'event_name' => (string) config('signals.integrations.orders.refund_event_name', 'order.refunded'),
             'event_category' => (string) config('signals.integrations.orders.refund_event_category', 'conversion'),
             'external_id' => $this->stringValue($this->attributeValue($order, 'customer_id')),
-            'anonymous_id' => $cartId,
+            'anonymous_id' => $anonymousId,
             'occurred_at' => $this->timestampValue($this->attributeValue($order, 'updated_at')),
             'revenue_minor' => $amount,
             'currency' => $this->stringValue($this->attributeValue($order, 'currency')) ?? (string) config('signals.defaults.currency', 'MYR'),
@@ -123,6 +150,7 @@ final class CommerceSignalsRecorder
                 'order_id' => $this->stringValue($order->getKey()),
                 'order_number' => $this->stringValue($this->attributeValue($order, 'order_number')),
                 'refund_reason' => $reason,
+                'growth_visitor_id' => $anonymousId,
             ]),
         ]);
     }
@@ -561,6 +589,48 @@ final class CommerceSignalsRecorder
         }
 
         return $this->stringValue(data_get($metadata, $key));
+    }
+
+    private function growthVisitorIdFromCheckoutSession(Model $session): ?string
+    {
+        $paymentData = $this->attributeValue($session, 'payment_data');
+
+        if (is_array($paymentData)) {
+            $value = $this->stringValue(data_get($paymentData, 'growth_visitor_id'));
+
+            if ($value !== null) {
+                return $value;
+            }
+        }
+
+        $billingData = $this->attributeValue($session, 'billing_data');
+
+        if (is_array($billingData)) {
+            $value = $this->stringValue(data_get($billingData, 'metadata.growth_visitor_id'));
+
+            if ($value !== null) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private function growthVisitorIdFromOrder(Model $order): ?string
+    {
+        return $this->orderMetadataValue($order, 'payment_data.growth_visitor_id')
+            ?? $this->orderMetadataValue($order, 'growth_visitor_id');
+    }
+
+    private function isEventRecordingEnabled(string $eventName): bool
+    {
+        $value = config('signals.recording.events.' . $eventName);
+
+        if ($value === null) {
+            return true;
+        }
+
+        return (bool) $value;
     }
 
     private function attributeValue(Model $model, string $attribute): mixed

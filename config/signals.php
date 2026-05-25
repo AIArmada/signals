@@ -50,6 +50,16 @@ return [
         'session_duration_seconds' => 1800,
     ],
 
+    /* Recording toggles */
+    'recording' => [
+        'events' => [
+            'checkout.started' => env('SIGNALS_RECORDING_EVENT_CHECKOUT_STARTED', true),
+            'checkout.completed' => env('SIGNALS_RECORDING_EVENT_CHECKOUT_COMPLETED', true),
+            'order.paid' => env('SIGNALS_RECORDING_EVENT_ORDER_PAID', true),
+            'order.refunded' => env('SIGNALS_RECORDING_EVENT_ORDER_REFUNDED', true),
+        ],
+    ],
+
     /* Owner */
     'owner' => [
         'enabled' => true,

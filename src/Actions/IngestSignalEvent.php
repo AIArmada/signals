@@ -82,12 +82,15 @@ final class IngestSignalEvent
         $this->withTrackedPropertyOwner($trackedProperty, static fn (): bool => $event->save());
 
         if ($session instanceof SignalSession) {
-            $session->exit_path = $payload['path'] ?? $session->exit_path;
-            $session->ended_at = $occurredAt;
-            $durationMilliseconds = max(0, (int) ($session->started_at?->diffInMilliseconds($occurredAt) ?? 0));
-            $session->duration_milliseconds = $durationMilliseconds;
-            $session->is_bounce = ! $session->events()->whereKeyNot($event->id)->exists();
-            $this->withTrackedPropertyOwner($trackedProperty, static fn (): bool => $session->save());
+            $this->withTrackedPropertyOwner($trackedProperty, function () use ($session, $payload, $occurredAt, $event): bool {
+                $session->exit_path = $payload['path'] ?? $session->exit_path;
+                $session->ended_at = $occurredAt;
+                $durationMilliseconds = max(0, (int) ($session->started_at?->diffInMilliseconds($occurredAt) ?? 0));
+                $session->duration_milliseconds = $durationMilliseconds;
+                $session->is_bounce = ! $session->events()->whereKeyNot($event->id)->exists();
+
+                return $session->save();
+            });
         }
 
         $this->evaluateAlertsAfterIngest($event);

@@ -99,15 +99,16 @@ final class RetentionReportService
      */
     private function cohorts(?string $trackedPropertyId, ?string $from, ?string $until, ?string $signalSegmentId, array $retentionWindows): Collection
     {
-        return $this->baseQuery($trackedPropertyId, $from, $until, $signalSegmentId)
+        /** @var Collection<int, array{cohort_date: string, cohort_size: int, windows: list<array{days: int, retained: int, retention_rate: float}>}> $cohorts */
+        $cohorts = $this->baseQuery($trackedPropertyId, $from, $until, $signalSegmentId)
             ->get()
             ->groupBy(function (SignalIdentity $identity): string {
                 return $identity->first_seen_at?->toDateString() ?? 'unknown';
             })
             ->map(function (Collection $identities, string $cohortDate) use ($retentionWindows): array {
-                $cohortSize = $identities->count();
+                $cohortSize = (int) $identities->count();
                 $windows = array_map(function (int $days) use ($identities, $cohortSize): array {
-                    $retained = $identities->filter(function (SignalIdentity $identity) use ($days): bool {
+                    $retained = (int) $identities->filter(function (SignalIdentity $identity) use ($days): bool {
                         return $this->isRetainedAfterDays($identity, $days);
                     })->count();
 
@@ -124,7 +125,10 @@ final class RetentionReportService
                     'windows' => $windows,
                 ];
             })
-            ->sortByDesc('cohort_date');
+            ->sortByDesc('cohort_date')
+            ->values();
+
+        return $cohorts;
     }
 
     private function isRetainedAfterDays(SignalIdentity $identity, int $days): bool

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Services;
 
+use AIArmada\CommerceSupport\Support\ConnectionDriver;
 use Illuminate\Database\Eloquent\Builder;
 use RuntimeException;
 
@@ -168,7 +169,7 @@ final class SignalEventConditionQueryService
      */
     private function jsonTextExpression(Builder $query, string $column, array $propertySegments): string
     {
-        $driver = $query->getConnection()->getDriverName();
+        $driver = ConnectionDriver::name($query->getConnection());
         $jsonPath = '$.' . implode('.', $propertySegments);
         $postgresPath = '{' . implode(',', $propertySegments) . '}';
 
@@ -182,7 +183,7 @@ final class SignalEventConditionQueryService
 
     private function castNumericExpression(Builder $query, string $expression): string
     {
-        return match ($query->getConnection()->getDriverName()) {
+        return match (ConnectionDriver::name($query->getConnection())) {
             'pgsql' => "CAST({$expression} AS NUMERIC)",
             'mysql', 'mariadb', 'sqlite' => "CAST({$expression} AS DECIMAL(20, 6))",
             default => $expression,
