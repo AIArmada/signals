@@ -36,11 +36,26 @@ final class ServeSignalsTracker
 
   var trackerUrl = new URL(script.src, window.location.href);
   var endpoint = script.dataset.endpoint;
+  var eventEndpoint = script.dataset.eventEndpoint || null;
   var identifyEndpoint = script.dataset.identifyEndpoint || null;
   var geoEndpoint = script.dataset.geoEndpoint || null;
   var externalId = script.dataset.externalId || null;
   var email = script.dataset.email || null;
   var enableGeolocation = script.dataset.enableGeolocation === 'true';
+  var interactionRules = (function () {
+    if (!script.dataset.interactionRules) {
+      return [];
+    }
+
+    try {
+      var parsed = JSON.parse(script.dataset.interactionRules);
+
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.warn('Signals tracker could not parse data-interaction-rules.');
+      return [];
+    }
+  }());
   var pageProperties = (function () {
     if (!script.dataset.pageProperties) {
       return null;
@@ -67,6 +82,14 @@ final class ServeSignalsTracker
     u.search = '';
     u.hash = '';
     identifyEndpoint = u.toString();
+  }
+
+  if (!eventEndpoint) {
+    var eventUrl = new URL(script.src, window.location.href);
+    eventUrl.pathname = eventUrl.pathname.replace(/__TRACKER_SCRIPT_PATTERN__$/, '/collect/event');
+    eventUrl.search = '';
+    eventUrl.hash = '';
+    eventEndpoint = eventUrl.toString();
   }
 
   if (!geoEndpoint) {
@@ -106,6 +129,28 @@ final class ServeSignalsTracker
     };
   }
 
+  function emit(endpointUrl, data) {
+    if (!endpointUrl) {
+      return;
+    }
+
+    var body = JSON.stringify(data);
+
+    if (navigator.sendBeacon && navigator.sendBeacon(endpointUrl, new Blob([body], { type: 'application/json' }))) {
+      return;
+    }
+
+    fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: body,
+      keepalive: true,
+      credentials: 'omit'
+    }).catch(function () {});
+  }
+
   function sendIdentify() {
     if (!identifyEndpoint || !externalId) {
       return;
@@ -119,7 +164,7 @@ final class ServeSignalsTracker
 
     sessionStorage.setItem(markerKey, anonymousId);
 
-    var body = JSON.stringify({
+    emit(identifyEndpoint, {
       write_key: writeKey,
       external_id: externalId,
       anonymous_id: anonymousId,
@@ -127,20 +172,6 @@ final class ServeSignalsTracker
       seen_at: new Date().toISOString(),
       url: window.location.href
     });
-
-    if (navigator.sendBeacon && navigator.sendBeacon(identifyEndpoint, new Blob([body], { type: 'application/json' }))) {
-      return;
-    }
-
-    fetch(identifyEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: body,
-      keepalive: true,
-      credentials: 'omit'
-    }).catch(function () {});
   }
 
   function sendPageView() {
@@ -150,21 +181,285 @@ final class ServeSignalsTracker
 
     lastUrl = window.location.href;
 
-    var body = JSON.stringify(payload());
+    emit(endpoint, payload());
+  }
 
-    if (navigator.sendBeacon && navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }))) {
+  function currentTrackingContext() {
+    var params = new URLSearchParams(window.location.search);
+
+    return {
+      write_key: writeKey,
+      external_id: externalId,
+      anonymous_id: anonymousId,
+      email: email,
+      session_identifier: sessionId,
+      session_started_at: sessionStartedAt,
+      occurred_at: new Date().toISOString(),
+      path: window.location.pathname + window.location.search + window.location.hash,
+      url: window.location.href,
+      referrer: document.referrer || null,
+      utm_source: params.get('utm_source'),
+      utm_medium: params.get('utm_medium'),
+      utm_campaign: params.get('utm_campaign'),
+      utm_content: params.get('utm_content'),
+      utm_term: params.get('utm_term')
+    };
+  }
+
+  function normalizeText(value) {
+    if (!value) {
+      return null;
+    }
+
+    return String(value).replace(/\s+/g, ' ').trim() || null;
+  }
+
+  function eventProperties(rule, element, extraProperties) {
+    var properties = pageProperties && typeof pageProperties === 'object'
+      ? Object.assign({}, pageProperties)
+      : {};
+
+    properties.interaction_rule_id = rule.id || null;
+    properties.interaction_rule_slug = rule.slug || null;
+    properties.interaction_rule_name = rule.name || null;
+    properties.interaction_trigger_type = rule.trigger_type || null;
+    properties.interaction_selector = rule.selector || null;
+
+    if (element && element.tagName) {
+      properties.element_tag = String(element.tagName).toLowerCase();
+      properties.element_id = element.id || null;
+      properties.element_class = normalizeText(element.className);
+      properties.element_text = normalizeText(element.innerText || element.textContent);
+      properties.element_href = element.href || null;
+    }
+
+    if (extraProperties && typeof extraProperties === 'object') {
+      Object.keys(extraProperties).forEach(function (key) {
+        properties[key] = extraProperties[key];
+      });
+    }
+
+    return properties;
+  }
+
+  function matchesPage(rule) {
+    var pattern = rule.page_pattern;
+
+    if (!pattern) {
+      return true;
+    }
+
+    var path = window.location.pathname;
+    var escaped = String(pattern)
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*/g, '.*');
+    var regex = new RegExp('^' + escaped + '$');
+
+    return regex.test(path);
+  }
+
+  function shouldTrackRule(rule) {
+    return !!rule && !!rule.event_name && matchesPage(rule);
+  }
+
+  function shouldTrackOncePerSession(rule, marker) {
+    var settings = rule.settings && typeof rule.settings === 'object' ? rule.settings : {};
+
+    if (settings.once_per_session !== true) {
+      return true;
+    }
+
+    var key = 'signals:rule:' + (rule.id || rule.slug || rule.event_name) + ':' + marker;
+
+    if (sessionStorage.getItem(key) === '1') {
+      return false;
+    }
+
+    sessionStorage.setItem(key, '1');
+
+    return true;
+  }
+
+  function trackInteraction(rule, element, extraProperties) {
+    if (!shouldTrackRule(rule)) {
       return;
     }
 
-    fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: body,
-      keepalive: true,
-      credentials: 'omit'
-    }).catch(function () {});
+    var marker = (extraProperties && extraProperties.action) || 'default';
+
+    if (!shouldTrackOncePerSession(rule, marker)) {
+      return;
+    }
+
+    var context = currentTrackingContext();
+
+    emit(eventEndpoint, {
+      write_key: context.write_key,
+      event_name: rule.event_name,
+      event_category: rule.event_category || 'engagement',
+      external_id: context.external_id,
+      anonymous_id: context.anonymous_id,
+      email: context.email,
+      session_identifier: context.session_identifier,
+      session_started_at: context.session_started_at,
+      occurred_at: context.occurred_at,
+      path: context.path,
+      url: context.url,
+      referrer: context.referrer,
+      utm_source: context.utm_source,
+      utm_medium: context.utm_medium,
+      utm_campaign: context.utm_campaign,
+      utm_content: context.utm_content,
+      utm_term: context.utm_term,
+      properties: eventProperties(rule, element, extraProperties)
+    });
+  }
+
+  function safeClosest(target, selector) {
+    if (!target || !selector || typeof target.closest !== 'function') {
+      return null;
+    }
+
+    try {
+      return target.closest(selector);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function installClickRules(rules) {
+    if (!rules.length) {
+      return;
+    }
+
+    document.addEventListener('click', function (event) {
+      rules.forEach(function (rule) {
+        var matched = safeClosest(event.target, rule.selector || '');
+
+        if (!matched) {
+          return;
+        }
+
+        trackInteraction(rule, matched, {
+          action: 'click'
+        });
+      });
+    }, true);
+  }
+
+  function expandedStateForAccordion(element) {
+    if (!element) {
+      return null;
+    }
+
+    var detailsHost = element.closest('details');
+
+    if (detailsHost) {
+      return detailsHost.open ? 'open' : 'closed';
+    }
+
+    var expanded = element.getAttribute('aria-expanded');
+
+    if (expanded === 'true') {
+      return 'open';
+    }
+
+    if (expanded === 'false') {
+      return 'closed';
+    }
+
+    return null;
+  }
+
+  function installAccordionRules(rules) {
+    if (!rules.length) {
+      return;
+    }
+
+    document.addEventListener('click', function (event) {
+      rules.forEach(function (rule) {
+        var matched = safeClosest(event.target, rule.selector || '');
+
+        if (!matched) {
+          return;
+        }
+
+        setTimeout(function () {
+          trackInteraction(rule, matched, {
+            action: 'accordion_toggle',
+            accordion_state: expandedStateForAccordion(matched)
+          });
+        }, 0);
+      });
+    }, true);
+  }
+
+  function installMediaRules(rules) {
+    if (!rules.length) {
+      return;
+    }
+
+    ['play', 'pause', 'ended'].forEach(function (eventName) {
+      document.addEventListener(eventName, function (event) {
+        rules.forEach(function (rule) {
+          var mediaElement = safeClosest(event.target, rule.selector || 'audio,video');
+
+          if (!mediaElement) {
+            return;
+          }
+
+          trackInteraction(rule, mediaElement, {
+            action: eventName,
+            media_current_time: typeof mediaElement.currentTime === 'number' ? mediaElement.currentTime : null,
+            media_duration: typeof mediaElement.duration === 'number' && isFinite(mediaElement.duration) ? mediaElement.duration : null
+          });
+        });
+      }, true);
+    });
+  }
+
+  function installYoutubeRules(rules) {
+    if (!rules.length) {
+      return;
+    }
+
+    document.addEventListener('click', function (event) {
+      rules.forEach(function (rule) {
+        var matched = safeClosest(event.target, rule.selector || '');
+
+        if (!matched) {
+          return;
+        }
+
+        trackInteraction(rule, matched, {
+          action: 'youtube_click'
+        });
+      });
+    }, true);
+  }
+
+  function installInteractionTracking() {
+    if (!Array.isArray(interactionRules) || !interactionRules.length || !eventEndpoint) {
+      return;
+    }
+
+    var clickRules = interactionRules.filter(function (rule) {
+      return rule.trigger_type === 'click' && !!rule.selector;
+    });
+    var accordionRules = interactionRules.filter(function (rule) {
+      return rule.trigger_type === 'accordion' && !!rule.selector;
+    });
+    var mediaRules = interactionRules.filter(function (rule) {
+      return rule.trigger_type === 'media';
+    });
+    var youtubeRules = interactionRules.filter(function (rule) {
+      return rule.trigger_type === 'youtube' && !!rule.selector;
+    });
+
+    installClickRules(clickRules);
+    installAccordionRules(accordionRules);
+    installMediaRules(mediaRules);
+    installYoutubeRules(youtubeRules);
   }
 
   var originalPushState = history.pushState;
@@ -202,25 +497,13 @@ final class ServeSignalsTracker
       function (position) {
         sessionStorage.setItem(geoKey, '1');
 
-        var body = JSON.stringify({
+        emit(geoEndpoint, {
           write_key: writeKey,
           session_identifier: sessionId,
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           accuracy: position.coords.accuracy || null
         });
-
-        if (navigator.sendBeacon && navigator.sendBeacon(geoEndpoint, new Blob([body], { type: 'application/json' }))) {
-          return;
-        }
-
-        fetch(geoEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: body,
-          keepalive: true,
-          credentials: 'omit'
-        }).catch(function () {});
       },
       function () {},
       { timeout: 10000, maximumAge: 300000 }
@@ -229,6 +512,7 @@ final class ServeSignalsTracker
 
   sendIdentify();
   sendPageView();
+  installInteractionTracking();
   setTimeout(captureGeolocation, 500);
 })();
 JS;

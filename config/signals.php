@@ -14,6 +14,7 @@ return [
             'identities' => $tablePrefix . 'identities',
             'sessions' => $tablePrefix . 'sessions',
             'events' => $tablePrefix . 'events',
+            'interaction_rules' => $tablePrefix . 'interaction_rules',
             'daily_metrics' => $tablePrefix . 'daily_metrics',
             'goals' => $tablePrefix . 'goals',
             'segments' => $tablePrefix . 'segments',
@@ -174,6 +175,10 @@ return [
             'auto_register_middleware' => true,
             'middleware_group' => 'web',
             'auto_inject' => true,
+            'interaction_tracking' => [
+                'enabled' => true,
+                'include_rules_without_selector' => false,
+            ],
             'identifiers' => [
                 'visitor_cookie_name' => 'sig_vid',
                 'session_cookie_name' => 'sig_sid',

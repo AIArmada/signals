@@ -6,6 +6,7 @@ namespace AIArmada\Signals\Support\Browser;
 
 use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\Growth\Support\ExperimentContextManager;
+use AIArmada\Signals\Models\SignalInteractionRule;
 use AIArmada\Signals\Models\TrackedProperty;
 use AIArmada\Signals\Services\TrackedPropertyResolver;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -50,12 +51,14 @@ final class SignalsTrackerRenderer
             ?? $this->browserContextManager->resolveOrCreate($request);
 
         $pageProperties = $this->pageProperties($overrides);
+        $interactionRules = $this->interactionRules($trackedProperty);
         $attributes = [
             'defer' => true,
             'src' => $this->signalUrl((string) config('signals.http.tracker_script', 'tracker.js')),
             'data-signals-tracker' => '1',
             'data-write-key' => $trackedProperty->write_key,
             'data-endpoint' => $this->signalUrl('collect/pageview'),
+            'data-event-endpoint' => $this->signalUrl('collect/event'),
             'data-identify-endpoint' => $this->signalUrl('collect/identify'),
             'data-geo-endpoint' => $this->signalUrl('collect/geo'),
             'data-anonymous-id' => $context->visitorId,
@@ -70,11 +73,69 @@ final class SignalsTrackerRenderer
             'data-external-id' => $this->externalId($overrides),
             'data-email' => $this->email($overrides),
             'data-page-properties' => $pageProperties === [] ? null : $this->jsonEncode($pageProperties),
+            'data-interaction-rules' => $interactionRules === [] ? null : $this->jsonEncode($interactionRules),
         ];
 
         $this->browserContextManager->markTrackerRendered($request);
 
         return $this->scriptTag($attributes);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function interactionRules(TrackedProperty $trackedProperty): array
+    {
+        if (! (bool) config('signals.integrations.browser.interaction_tracking.enabled', true)) {
+            return [];
+        }
+
+        $includeRulesWithoutSelector = (bool) config('signals.integrations.browser.interaction_tracking.include_rules_without_selector', false);
+
+        /** @var list<array<string, mixed>> $rules */
+        $rules = SignalInteractionRule::query()
+            ->forOwner()
+            ->where('is_active', true)
+            ->where(function ($query) use ($trackedProperty): void {
+                $query->whereNull('tracked_property_id')
+                    ->orWhere('tracked_property_id', $trackedProperty->getKey());
+            })
+            ->when(! $includeRulesWithoutSelector, static function ($query): void {
+                $query->where(function ($innerQuery): void {
+                    $innerQuery->where('trigger_type', 'media')
+                        ->orWhere(static function ($selectorQuery): void {
+                            $selectorQuery->whereNotNull('selector')->where('selector', '!=', '');
+                        });
+                });
+            })
+            ->orderBy('sort_order')
+            ->orderBy('created_at')
+            ->get([
+                'id',
+                'name',
+                'slug',
+                'trigger_type',
+                'event_name',
+                'event_category',
+                'selector',
+                'page_pattern',
+                'settings',
+            ])
+            ->map(static fn (SignalInteractionRule $rule): array => [
+                'id' => (string) $rule->getKey(),
+                'name' => (string) $rule->name,
+                'slug' => (string) $rule->slug,
+                'trigger_type' => (string) $rule->trigger_type,
+                'event_name' => (string) $rule->event_name,
+                'event_category' => $rule->event_category,
+                'selector' => $rule->selector,
+                'page_pattern' => $rule->page_pattern,
+                'settings' => is_array($rule->settings) ? $rule->settings : null,
+            ])
+            ->values()
+            ->all();
+
+        return $rules;
     }
 
     private function resolveTrackedProperty(): ?TrackedProperty
@@ -282,7 +343,7 @@ final class SignalsTrackerRenderer
     }
 
     /**
-     * @param  array<string, mixed>  $value
+     * @param  array<mixed>  $value
      */
     private function jsonEncode(array $value): string
     {

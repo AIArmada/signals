@@ -32,6 +32,7 @@ use Illuminate\Support\Str;
  * @property-read Collection<int, SignalIdentity> $identities
  * @property-read Collection<int, SignalSession> $sessions
  * @property-read Collection<int, SignalEvent> $events
+ * @property-read Collection<int, SignalInteractionRule> $interactionRules
  * @property-read Collection<int, SignalDailyMetric> $dailyMetrics
  * @property-read Collection<int, SignalGoal> $goals
  * @property-read Collection<int, SavedSignalReport> $savedReports
@@ -107,6 +108,14 @@ final class TrackedProperty extends Model
     }
 
     /**
+     * @return HasMany<SignalInteractionRule, $this>
+     */
+    public function interactionRules(): HasMany
+    {
+        return $this->hasMany(SignalInteractionRule::class, 'tracked_property_id');
+    }
+
+    /**
      * @return HasMany<SignalDailyMetric, $this>
      */
     public function dailyMetrics(): HasMany
@@ -177,6 +186,7 @@ final class TrackedProperty extends Model
             $trackedProperty->alertLogs()->update(['tracked_property_id' => null]);
             $trackedProperty->dailyMetrics()->delete();
             $trackedProperty->events()->delete();
+            $trackedProperty->interactionRules()->delete();
             $trackedProperty->sessions()->delete();
             $trackedProperty->identities()->delete();
         });
