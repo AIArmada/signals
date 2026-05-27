@@ -11,7 +11,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create(config('signals.database.tables.goals', 'signal_goals'), function (Blueprint $table): void {
-            $jsonColumnType = config('signals.database.json_column_type', commerce_json_column_type('signals', 'json'));
+            $jsonColumnType = config('signals.database.json_column_type', commerce_json_column_type('signals', 'jsonb'));
 
             $table->uuid('id')->primary();
             $table->nullableUuidMorphs('owner');

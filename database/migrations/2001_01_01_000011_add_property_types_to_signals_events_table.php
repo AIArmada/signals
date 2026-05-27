@@ -17,7 +17,7 @@ return new class extends Migration
         }
 
         Schema::table($table, function (Blueprint $table): void {
-            $jsonColumnType = config('signals.database.json_column_type', commerce_json_column_type('signals', 'json'));
+            $jsonColumnType = config('signals.database.json_column_type', commerce_json_column_type('signals', 'jsonb'));
 
             $table->{$jsonColumnType}('property_types')->nullable()->after('properties');
         });
