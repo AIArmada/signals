@@ -11,12 +11,13 @@ Signals configuration lives in `config/signals.php`.
 ```php
 'database' => [
     'table_prefix' => 'signal_',
-    'json_column_type' => env('SIGNALS_JSON_COLUMN_TYPE', env('COMMERCE_JSON_COLUMN_TYPE', 'json')),
+    'json_column_type' => env('SIGNALS_JSON_COLUMN_TYPE', env('COMMERCE_JSON_COLUMN_TYPE', 'jsonb')),
     'tables' => [
         'tracked_properties' => 'signal_tracked_properties',
         'identities'         => 'signal_identities',
         'sessions'           => 'signal_sessions',
         'events'             => 'signal_events',
+        'interaction_rules'  => 'signal_interaction_rules',
         'daily_metrics'      => 'signal_daily_metrics',
         'goals'              => 'signal_goals',
         'segments'           => 'signal_segments',
@@ -68,13 +69,13 @@ These toggles let you suppress specific built-in commerce recordings without dis
 
 ```php
 'owner' => [
-    'enabled'              => true,
+    'enabled'              => false,
     'include_global'       => false,
     'auto_assign_on_create' => true,
 ],
 ```
 
-Owner mode is default-on for Signals. Missing owner context fails fast unless explicit global context is used.
+Owner mode is opt-in for Signals. With the default config, browser/global analytics can run without a resolved owner. Once you enable owner mode, tracked-property resolution, writes, and admin queries follow the configured owner boundary and require either a resolved owner or explicit global context.
 
 ## Features
 
@@ -208,6 +209,10 @@ Each integration is independently toggled. Browser and cart integrations default
         'auto_register_middleware' => true,
         'middleware_group' => 'web',
         'auto_inject' => true,
+        'interaction_tracking' => [
+            'enabled' => true,
+            'include_rules_without_selector' => false,
+        ],
         'identifiers' => [
             'visitor_cookie_name' => 'sig_vid',
             'session_cookie_name' => 'sig_sid',
@@ -237,7 +242,8 @@ Each integration is independently toggled. Browser and cart integrations default
 Browser integration controls:
 
 - middleware bootstrapping for browser cookies and session state
-- optional automatic tracker injection into successful HTML responses
+- optional automatic tracker injection into successful `GET` HTML responses
+- serialization of active `SignalInteractionRule` definitions into the browser tracker payload
 - default cookie names and lifetimes
 - automatic tracked-property creation for browser analytics
 - whether browser identify / geolocation payloads should be emitted

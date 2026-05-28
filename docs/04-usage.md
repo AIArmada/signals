@@ -104,6 +104,7 @@ When `signals.integrations.browser.enabled` is `true`, Signals can bootstrap bro
 - `signals.browser` middleware resolves or creates `sig_vid` and `sig_sid`
 - the middleware queues those cookies onto the response
 - successful `GET` HTML responses can receive an injected tracker tag automatically when `signals.integrations.browser.auto_inject` is `true`
+- auto-injection skips binary/streamed responses and will not double-inject if you rendered `@signalsTracker(...)` manually
 
 If you keep `auto_register_middleware = true`, the middleware is appended to the configured group automatically.
 
@@ -148,6 +149,15 @@ The tracker:
 - records additional page views on SPA navigation events
 - optionally captures browser geolocation after a short delay when enabled
 - posts to the configured page-view, identify, and geo endpoints
+
+### Interaction rules
+
+When `signals.integrations.browser.interaction_tracking.enabled` is `true`, the rendered tracker payload also includes active `SignalInteractionRule` definitions for the current tracked property.
+
+- active rules are filtered to the current owner / explicit global context when owner mode is enabled
+- rules scoped to a tracked property are included for that tracked property, alongside global rules with no tracked property set
+- selector-less rules are omitted by default unless `include_rules_without_selector` is enabled
+- `media` trigger rules are still included without a selector so the tracker can observe media events
 
 ## Server-Side Event Recording
 
