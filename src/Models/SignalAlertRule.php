@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Models;
 
+use AIArmada\CommerceSupport\Concerns\HasCommerceAudit;
+use AIArmada\CommerceSupport\Concerns\LogsCommerceActivity;
 use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
@@ -15,6 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use OwenIt\Auditing\Contracts\Auditable;
 use RuntimeException;
 
 /**
@@ -42,13 +45,15 @@ use RuntimeException;
  * @property-read TrackedProperty|null $trackedProperty
  * @property-read Collection<int, SignalAlertLog> $logs
  */
-final class SignalAlertRule extends Model
+final class SignalAlertRule extends Model implements Auditable
 {
     use AutoAssignsSignalOwnerOnCreate;
+    use HasCommerceAudit;
     use HasOwner;
     use HasOwnerScopeConfig;
     use HasOwnerScopeKey;
     use HasUuids;
+    use LogsCommerceActivity;
 
     protected static string $ownerScopeConfigKey = 'signals.owner';
 
@@ -79,6 +84,31 @@ final class SignalAlertRule extends Model
         'owner_type',
         'owner_id',
     ];
+
+    public function getAuditInclude(): array
+    {
+        return [
+            'tracked_property_id',
+            'name',
+            'slug',
+            'description',
+            'metric_key',
+            'operator',
+            'threshold',
+            'event_filters',
+            'channels',
+            'destination_keys',
+            'inline_destinations',
+            'timeframe_minutes',
+            'cooldown_minutes',
+            'severity',
+            'priority',
+            'last_triggered_at',
+            'is_active',
+            'owner_type',
+            'owner_id',
+        ];
+    }
 
     public function getTable(): string
     {
@@ -180,5 +210,10 @@ final class SignalAlertRule extends Model
             'last_triggered_at' => 'datetime',
             'is_active' => 'boolean',
         ];
+    }
+
+    protected function getActivityLogName(): string
+    {
+        return 'signals';
     }
 }

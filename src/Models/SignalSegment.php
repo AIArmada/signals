@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Models;
 
+use AIArmada\CommerceSupport\Concerns\HasCommerceAudit;
+use AIArmada\CommerceSupport\Concerns\LogsCommerceActivity;
 use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
@@ -14,6 +16,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use InvalidArgumentException;
+use OwenIt\Auditing\Contracts\Auditable;
 use RuntimeException;
 
 /**
@@ -28,7 +31,7 @@ use RuntimeException;
  * @property bool $is_active
  * @property-read Collection<int, SavedSignalReport> $savedReports
  */
-final class SignalSegment extends Model
+final class SignalSegment extends Model implements Auditable
 {
     /** @var list<string> */
     private const SUPPORTED_MATCH_TYPES = [
@@ -37,9 +40,11 @@ final class SignalSegment extends Model
     ];
 
     use AutoAssignsSignalOwnerOnCreate;
+    use HasCommerceAudit;
     use HasOwner;
     use HasOwnerScopeConfig;
     use HasUuids;
+    use LogsCommerceActivity;
 
     protected static string $ownerScopeConfigKey = 'signals.owner';
 
@@ -54,6 +59,20 @@ final class SignalSegment extends Model
         'owner_type',
         'owner_id',
     ];
+
+    public function getAuditInclude(): array
+    {
+        return [
+            'name',
+            'slug',
+            'description',
+            'match_type',
+            'conditions',
+            'is_active',
+            'owner_type',
+            'owner_id',
+        ];
+    }
 
     /** @var array<string, string> */
     protected $casts = [
@@ -155,5 +174,10 @@ final class SignalSegment extends Model
     private static function isSupportedField(string $field): bool
     {
         return SignalEventConditionDefinition::isSupportedField($field);
+    }
+
+    protected function getActivityLogName(): string
+    {
+        return 'signals';
     }
 }

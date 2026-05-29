@@ -22,10 +22,13 @@ return new class extends Migration
             $table->{$jsonColumnType}('traits')->nullable();
             $table->timestamp('first_seen_at')->nullable();
             $table->timestamp('last_seen_at')->nullable();
+            $table->string('auth_user_type')->nullable();
+            $table->string('auth_user_id')->nullable();
             $table->timestamps();
 
             $table->index(['tracked_property_id', 'last_seen_at']);
             $table->index('anonymous_id');
+            $table->index(['auth_user_type', 'auth_user_id']);
             $table->unique(['tracked_property_id', 'external_id']);
         });
     }

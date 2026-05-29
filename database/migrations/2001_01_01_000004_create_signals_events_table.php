@@ -34,6 +34,7 @@ return new class extends Migration
             $table->unsignedBigInteger('revenue_minor')->default(0);
             $table->string('currency', 3)->default(config('signals.defaults.currency', 'MYR'));
             $table->{$jsonColumnType}('properties')->nullable();
+            $table->{$jsonColumnType}('property_types')->nullable();
             $table->timestamps();
 
             $table->index(['tracked_property_id', 'occurred_at']);

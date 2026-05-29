@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Models;
 
+use AIArmada\CommerceSupport\Concerns\HasCommerceAudit;
+use AIArmada\CommerceSupport\Concerns\LogsCommerceActivity;
 use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
@@ -13,6 +15,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use InvalidArgumentException;
+use OwenIt\Auditing\Contracts\Auditable;
 use RuntimeException;
 
 /**
@@ -30,12 +33,14 @@ use RuntimeException;
  * @property bool $is_active
  * @property-read TrackedProperty|null $trackedProperty
  */
-final class SignalGoal extends Model
+final class SignalGoal extends Model implements Auditable
 {
     use AutoAssignsSignalOwnerOnCreate;
+    use HasCommerceAudit;
     use HasOwner;
     use HasOwnerScopeConfig;
     use HasUuids;
+    use LogsCommerceActivity;
 
     protected static string $ownerScopeConfigKey = 'signals.owner';
 
@@ -53,6 +58,23 @@ final class SignalGoal extends Model
         'owner_type',
         'owner_id',
     ];
+
+    public function getAuditInclude(): array
+    {
+        return [
+            'tracked_property_id',
+            'name',
+            'slug',
+            'description',
+            'goal_type',
+            'event_name',
+            'event_category',
+            'conditions',
+            'is_active',
+            'owner_type',
+            'owner_id',
+        ];
+    }
 
     /** @var array<string, string> */
     protected $casts = [
@@ -149,5 +171,10 @@ final class SignalGoal extends Model
     private static function isSupportedField(string $field): bool
     {
         return SignalEventConditionDefinition::isSupportedField($field);
+    }
+
+    protected function getActivityLogName(): string
+    {
+        return 'signals';
     }
 }

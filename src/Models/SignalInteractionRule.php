@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Models;
 
+use AIArmada\CommerceSupport\Concerns\HasCommerceAudit;
+use AIArmada\CommerceSupport\Concerns\LogsCommerceActivity;
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeKey;
@@ -11,6 +13,7 @@ use AIArmada\Signals\Models\Concerns\AutoAssignsSignalOwnerOnCreate;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use OwenIt\Auditing\Contracts\Auditable;
 
 /**
  * @property string $id
@@ -31,13 +34,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool $is_active
  * @property TrackedProperty|null $trackedProperty
  */
-final class SignalInteractionRule extends Model
+final class SignalInteractionRule extends Model implements Auditable
 {
     use AutoAssignsSignalOwnerOnCreate;
+    use HasCommerceAudit;
     use HasOwner;
     use HasOwnerScopeConfig;
     use HasOwnerScopeKey;
     use HasUuids;
+    use LogsCommerceActivity;
 
     protected static string $ownerScopeConfigKey = 'signals.owner';
 
@@ -64,6 +69,26 @@ final class SignalInteractionRule extends Model
         'owner_id',
     ];
 
+    public function getAuditInclude(): array
+    {
+        return [
+            'tracked_property_id',
+            'name',
+            'slug',
+            'description',
+            'trigger_type',
+            'event_name',
+            'event_category',
+            'selector',
+            'page_pattern',
+            'settings',
+            'sort_order',
+            'is_active',
+            'owner_type',
+            'owner_id',
+        ];
+    }
+
     /** @var array<string, string> */
     protected $casts = [
         'settings' => 'array',
@@ -85,5 +110,10 @@ final class SignalInteractionRule extends Model
     public function trackedProperty(): BelongsTo
     {
         return $this->belongsTo(TrackedProperty::class, 'tracked_property_id');
+    }
+
+    protected function getActivityLogName(): string
+    {
+        return 'signals';
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Models;
 
+use AIArmada\CommerceSupport\Concerns\HasCommerceAudit;
+use AIArmada\CommerceSupport\Concerns\LogsCommerceActivity;
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeKey;
@@ -14,6 +16,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use OwenIt\Auditing\Contracts\Auditable;
 
 /**
  * @property string $id
@@ -39,13 +42,15 @@ use Illuminate\Support\Str;
  * @property-read Collection<int, SignalAlertRule> $alertRules
  * @property-read Collection<int, SignalAlertLog> $alertLogs
  */
-final class TrackedProperty extends Model
+final class TrackedProperty extends Model implements Auditable
 {
     use AutoAssignsSignalOwnerOnCreate;
+    use HasCommerceAudit;
     use HasOwner;
     use HasOwnerScopeConfig;
     use HasOwnerScopeKey;
     use HasUuids;
+    use LogsCommerceActivity;
 
     protected static string $ownerScopeConfigKey = 'signals.owner';
 
@@ -68,6 +73,22 @@ final class TrackedProperty extends Model
         'owner_type',
         'owner_id',
     ];
+
+    public function getAuditInclude(): array
+    {
+        return [
+            'name',
+            'slug',
+            'domain',
+            'type',
+            'timezone',
+            'currency',
+            'is_active',
+            'settings',
+            'owner_type',
+            'owner_id',
+        ];
+    }
 
     /** @var array<string, string> */
     protected $casts = [
@@ -190,5 +211,18 @@ final class TrackedProperty extends Model
             $trackedProperty->sessions()->delete();
             $trackedProperty->identities()->delete();
         });
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function getLoggableAttributes(): array
+    {
+        return $this->getAuditInclude();
+    }
+
+    protected function getActivityLogName(): string
+    {
+        return 'signals';
     }
 }
