@@ -89,6 +89,42 @@ Optional device fields can be passed explicitly. When `ua_parsing` is enabled th
 }
 ```
 
+## Campaign Attribution
+
+Signals supports campaign-style attribution on page views, sessions, and events using common marketing fields:
+
+- `utm_source`
+- `utm_medium`
+- `utm_campaign`
+- `utm_content`
+- `utm_term`
+- `source`
+- `medium`
+- `campaign`
+- `content`
+- `term`
+- `referrer`
+
+The browser tracker automatically captures `utm_*` values from the landing page URL and sends the current page `referrer`. These values are persisted into Signals data so you can group traffic by channel, campaign, creative, or source.
+
+### Recommended URL patterns
+
+- **Google Ads**: `https://example.com/pricing?utm_source=google&utm_medium=cpc&utm_campaign=brand_search`
+- **Social ads**: `https://example.com/offer?utm_source=facebook&utm_medium=paid_social&utm_campaign=ramadan_sale&utm_content=carousel_a`
+- **Email**: `https://example.com/update?utm_source=newsletter&utm_medium=email&utm_campaign=may_launch`
+- **WhatsApp share**: `https://example.com/deal?utm_source=whatsapp&utm_medium=share&utm_campaign=group_forward`
+
+### Attribution guidance
+
+- Prefer `utm_*` values for anything you control, because they are explicit and consistent.
+- Treat `referrer` as a fallback signal only; it is often missing or stripped on messaging apps, short links, and some browser flows.
+- Use a redirect or short-link service if you need to track WhatsApp or offline QR-code traffic reliably.
+- Keep naming conventions stable so reporting can roll up traffic correctly over time.
+
+### Manual event tracking
+
+If you emit events from the server side, you can also include attribution fields in the payload you send to Signals so the event stays associated with the originating campaign.
+
 ## Browser Tracker
 
 Signals serves the tracker script from:
