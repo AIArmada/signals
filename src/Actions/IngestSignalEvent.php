@@ -17,6 +17,7 @@ use AIArmada\Signals\Services\SignalEventPropertyTypeInferrer;
 use AIArmada\Signals\Services\SignalsIngestionRequestValidator;
 use AIArmada\Signals\Services\SignalUserAgentParser;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -245,6 +246,50 @@ final class IngestSignalEvent
         if (! $session->exists) {
             $session->is_bounce = true;
         }
+
+        $this->syncOwnerFromProperty($session, $trackedProperty);
+
+        try {
+            $this->withTrackedPropertyOwner($trackedProperty, static fn (): bool => $session->save());
+
+            return $session;
+        } catch (QueryException $e) {
+            if ($e->getCode() !== '23505') {
+                throw $e;
+            }
+        }
+
+        // Race condition: another process created this session concurrently.
+        // Re-query, re-apply fill (preserving existing values), and update.
+        $session = SignalSession::query()
+            ->withoutOwnerScope()
+            ->where('tracked_property_id', $trackedProperty->id)
+            ->where('session_identifier', $sessionIdentifier)
+            ->firstOrFail();
+
+        $session->fill([
+            'signal_identity_id' => $identity?->id,
+            'entry_path' => $session->entry_path ?? ($payload['path'] ?? null),
+            'exit_path' => $payload['path'] ?? $session->exit_path,
+            'country' => $session->country ?? $this->resolveCountry($request, $payload),
+            'country_source' => $session->country_source ?? $this->resolveCountrySource($request, $payload),
+            'device_type' => $payload['device_type'] ?? ($parsed['device_type'] ?? $session->device_type),
+            'device_brand' => $payload['device_brand'] ?? ($parsed['device_brand'] ?? $session->device_brand),
+            'device_model' => $payload['device_model'] ?? ($parsed['device_model'] ?? $session->device_model),
+            'browser' => $payload['browser'] ?? ($parsed['browser'] ?? $session->browser),
+            'browser_version' => $payload['browser_version'] ?? ($parsed['browser_version'] ?? $session->browser_version),
+            'os' => $payload['os'] ?? ($parsed['os'] ?? $session->os),
+            'os_version' => $payload['os_version'] ?? ($parsed['os_version'] ?? $session->os_version),
+            'is_bot' => $parsed['is_bot'],
+            'user_agent' => $session->user_agent ?? ($rawUserAgent !== null && $storeRaw ? $rawUserAgent : null),
+            'ip_address' => $session->ip_address ?? $capturedIp,
+            'referrer' => $session->referrer ?? ($payload['referrer'] ?? null),
+            'utm_source' => $payload['utm_source'] ?? $session->utm_source,
+            'utm_medium' => $payload['utm_medium'] ?? $session->utm_medium,
+            'utm_campaign' => $payload['utm_campaign'] ?? $session->utm_campaign,
+            'utm_content' => $payload['utm_content'] ?? $session->utm_content,
+            'utm_term' => $payload['utm_term'] ?? $session->utm_term,
+        ]);
 
         $this->syncOwnerFromProperty($session, $trackedProperty);
         $this->withTrackedPropertyOwner($trackedProperty, static fn (): bool => $session->save());
