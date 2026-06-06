@@ -7,6 +7,17 @@ namespace AIArmada\Signals;
 use AIArmada\Signals\Console\Commands\AggregateDailyMetricsCommand;
 use AIArmada\Signals\Console\Commands\ProcessSignalAlertsCommand;
 use AIArmada\Signals\Contracts\SignalLocationResolverContract;
+use AIArmada\Signals\Models\SavedSignalReport;
+use AIArmada\Signals\Models\SignalAlertLog;
+use AIArmada\Signals\Models\SignalAlertRule;
+use AIArmada\Signals\Models\SignalDailyMetric;
+use AIArmada\Signals\Models\SignalEvent;
+use AIArmada\Signals\Models\SignalGoal;
+use AIArmada\Signals\Models\SignalIdentity;
+use AIArmada\Signals\Models\SignalInteractionRule;
+use AIArmada\Signals\Models\SignalSegment;
+use AIArmada\Signals\Models\SignalSession;
+use AIArmada\Signals\Models\TrackedProperty;
 use AIArmada\Signals\Services\CommerceSignalsRecorder;
 use AIArmada\Signals\Services\Geocoders\NominatimGeocoder;
 use AIArmada\Signals\Services\SignalAlertDispatcher;
@@ -20,6 +31,7 @@ use AIArmada\Signals\Support\Browser\SignalsBrowserContextManager;
 use AIArmada\Signals\Support\Browser\SignalsTrackerRenderer;
 use AIArmada\Signals\Support\CommerceSignalsIntegrationRegistrar;
 use AIArmada\Signals\Support\Http\Middleware\BootstrapSignalsBrowserContext;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Foundation\Http\Kernel;
 use Illuminate\Support\Facades\Blade;
@@ -66,10 +78,28 @@ final class SignalsServiceProvider extends PackageServiceProvider
 
     public function packageBooted(): void
     {
+        $this->registerMorphMap();
         $this->registerSignalsTrackerDirective();
         $this->registerBrowserMiddleware();
         $this->registerBrowserAutoInjection();
         app(CommerceSignalsIntegrationRegistrar::class)->boot();
+    }
+
+    private function registerMorphMap(): void
+    {
+        Relation::morphMap([
+            'tracked_property' => TrackedProperty::class,
+            'signal_session' => SignalSession::class,
+            'signal_event' => SignalEvent::class,
+            'signal_identity' => SignalIdentity::class,
+            'signal_goal' => SignalGoal::class,
+            'signal_daily_metric' => SignalDailyMetric::class,
+            'signal_interaction_rule' => SignalInteractionRule::class,
+            'signal_alert_rule' => SignalAlertRule::class,
+            'signal_alert_log' => SignalAlertLog::class,
+            'signal_segment' => SignalSegment::class,
+            'saved_signal_report' => SavedSignalReport::class,
+        ]);
     }
 
     private function registerSignalsTrackerDirective(): void
