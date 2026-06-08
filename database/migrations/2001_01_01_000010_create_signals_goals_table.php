@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('event_category')->nullable();
             $table->{$jsonColumnType}('conditions')->nullable();
             $table->boolean('is_active')->default(true);
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->unique(['owner_type', 'owner_id', 'slug']);
             $table->index(['tracked_property_id', 'is_active']);

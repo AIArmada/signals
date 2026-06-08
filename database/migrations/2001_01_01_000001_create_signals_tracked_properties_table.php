@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('currency', 3)->default(config('signals.defaults.currency', 'MYR'));
             $table->boolean('is_active')->default(true);
             $table->{$jsonColumnType}('settings')->nullable();
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->unique(['owner_scope', 'slug']);
             $table->index(['type', 'is_active']);

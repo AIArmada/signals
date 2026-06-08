@@ -20,11 +20,11 @@ return new class extends Migration
             $table->string('anonymous_id')->nullable();
             $table->string('email')->nullable();
             $table->{$jsonColumnType}('traits')->nullable();
-            $table->timestamp('first_seen_at')->nullable();
-            $table->timestamp('last_seen_at')->nullable();
+            $table->timestampTz('first_seen_at')->nullable();
+            $table->timestampTz('last_seen_at')->nullable();
             $table->string('auth_user_type')->nullable();
             $table->string('auth_user_id')->nullable();
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->index(['tracked_property_id', 'last_seen_at']);
             $table->index('anonymous_id');

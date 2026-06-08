@@ -28,7 +28,7 @@ return new class extends Migration
             $table->{$jsonColumnType}('settings')->nullable();
             $table->unsignedInteger('sort_order')->default(0);
             $table->boolean('is_active')->default(true);
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->unique(['owner_scope', 'slug']);
             $table->index(['tracked_property_id', 'is_active']);

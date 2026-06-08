@@ -25,7 +25,7 @@ return new class extends Migration
             $table->{$jsonColumnType}('settings')->nullable();
             $table->boolean('is_shared')->default(false);
             $table->boolean('is_active')->default(true);
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->unique(['owner_type', 'owner_id', 'slug']);
             $table->index(['report_type', 'is_active']);

@@ -18,8 +18,8 @@ return new class extends Migration
             $table->foreignUuid('signal_identity_id')->nullable();
             $table->string('session_identifier')->nullable();
             $table->nullableUuidMorphs('owner');
-            $table->timestamp('started_at');
-            $table->timestamp('ended_at')->nullable();
+            $table->timestampTz('started_at');
+            $table->timestampTz('ended_at')->nullable();
             $table->unsignedBigInteger('duration_milliseconds')->default(0);
             $table->string('entry_path')->nullable();
             $table->string('exit_path')->nullable();
@@ -29,7 +29,7 @@ return new class extends Migration
             $table->decimal('longitude', 11, 7)->nullable();
             $table->unsignedInteger('accuracy_meters')->nullable();
             $table->string('geolocation_source', 50)->nullable();
-            $table->timestamp('geolocation_captured_at')->nullable();
+            $table->timestampTz('geolocation_captured_at')->nullable();
             $table->string('resolved_country_code', 10)->nullable();
             $table->string('resolved_country_name', 100)->nullable();
             $table->string('resolved_state', 100)->nullable();
@@ -37,7 +37,7 @@ return new class extends Migration
             $table->string('resolved_postcode', 20)->nullable();
             $table->text('resolved_formatted_address')->nullable();
             $table->string('reverse_geocode_provider', 50)->nullable();
-            $table->timestamp('reverse_geocoded_at')->nullable();
+            $table->timestampTz('reverse_geocoded_at')->nullable();
             $table->{$jsonColumnType}('raw_reverse_geocode_payload')->nullable();
             $table->string('device_type')->nullable();
             $table->string('device_brand', 100)->nullable();
@@ -56,7 +56,7 @@ return new class extends Migration
             $table->boolean('is_bot')->default(false);
             $table->text('user_agent')->nullable();
             $table->string('ip_address', 45)->nullable();
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->index(['tracked_property_id', 'started_at']);
             $table->index(['signal_identity_id', 'started_at']);

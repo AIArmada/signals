@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('match_type')->default('all');
             $table->{$jsonColumnType}('conditions')->nullable();
             $table->boolean('is_active')->default(true);
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->unique(['owner_type', 'owner_id', 'slug']);
             $table->index(['match_type', 'is_active']);

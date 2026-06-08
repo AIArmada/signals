@@ -22,7 +22,7 @@ return new class extends Migration
             $table->unsignedInteger('events')->default(0);
             $table->unsignedInteger('conversions')->default(0);
             $table->unsignedBigInteger('revenue_minor')->default(0);
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->unique(['tracked_property_id', 'date']);
             $table->index(['date', 'owner_type', 'owner_id']);

@@ -31,9 +31,9 @@ return new class extends Migration
             $table->unsignedInteger('cooldown_minutes')->default(60);
             $table->string('severity')->default('warning');
             $table->unsignedInteger('priority')->default(0);
-            $table->timestamp('last_triggered_at')->nullable();
+            $table->timestampTz('last_triggered_at')->nullable();
             $table->boolean('is_active')->default(true);
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->unique(['owner_scope', 'slug']);
             $table->index(['metric_key', 'is_active']);

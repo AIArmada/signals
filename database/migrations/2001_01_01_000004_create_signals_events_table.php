@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignUuid('signal_session_id')->nullable();
             $table->foreignUuid('signal_identity_id')->nullable();
             $table->nullableUuidMorphs('owner');
-            $table->timestamp('occurred_at');
+            $table->timestampTz('occurred_at');
             $table->string('event_name');
             $table->string('event_category')->default('custom');
             $table->string('idempotency_key')->nullable();
@@ -35,7 +35,7 @@ return new class extends Migration
             $table->string('currency', 3)->default(config('signals.defaults.currency', 'MYR'));
             $table->{$jsonColumnType}('properties')->nullable();
             $table->{$jsonColumnType}('property_types')->nullable();
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->index(['tracked_property_id', 'occurred_at']);
             $table->index(['event_category', 'occurred_at']);
