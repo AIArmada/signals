@@ -633,6 +633,87 @@ final class CommerceSignalsRecorder
         return (bool) $value;
     }
 
+    public function recordOfferCreated(object $offer): ?SignalEvent
+    {
+        return $this->recordAffiliateNetworkEvent($offer, 'offer.created', 'affiliate_network');
+    }
+
+    public function recordOfferUpdated(object $offer): ?SignalEvent
+    {
+        return $this->recordAffiliateNetworkEvent($offer, 'offer.updated', 'affiliate_network');
+    }
+
+    public function recordApplicationSubmitted(object $application): ?SignalEvent
+    {
+        return $this->recordAffiliateNetworkEvent($application, 'application.submitted', 'affiliate_network');
+    }
+
+    public function recordApplicationApproved(object $application): ?SignalEvent
+    {
+        return $this->recordAffiliateNetworkEvent($application, 'application.approved', 'affiliate_network');
+    }
+
+    public function recordNetworkConversionRecorded(object $link, int $revenueMinor = 0): ?SignalEvent
+    {
+        return $this->recordAffiliateNetworkEvent($link, 'network.conversion.recorded', 'affiliate_network');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function recordSignal(string $eventName, array $data = []): ?SignalEvent
+    {
+        $trackedProperty = $this->trackedPropertyResolver->resolveForOwnerReference(
+            $data['owner_type'] ?? null,
+            $data['owner_id'] ?? null,
+            null,
+        );
+
+        if ($trackedProperty === null) {
+            return null;
+        }
+
+        return $this->ingestSignalEvent->handle($trackedProperty, [
+            'event_name' => $eventName,
+            'event_category' => $data['event_category'] ?? 'commerce',
+            'occurred_at' => $this->timestampValue($data['occurred_at'] ?? now()),
+            'revenue_minor' => (int) ($data['revenue_minor'] ?? 0),
+            'currency' => (string) ($data['currency'] ?? config('signals.defaults.currency', 'MYR')),
+            'external_id' => $data['external_id'] ?? null,
+            'anonymous_id' => $data['anonymous_id'] ?? null,
+            'properties' => $data['properties'] ?? array_filter($data, static fn (string $key): bool => ! in_array($key, ['event_category', 'occurred_at', 'revenue_minor', 'currency', 'external_id', 'anonymous_id', 'owner_type', 'owner_id', 'properties'], true), ARRAY_FILTER_USE_KEY),
+        ]);
+    }
+
+    private function recordAffiliateNetworkEvent(object $subject, string $eventName, string $category): ?SignalEvent
+    {
+        $ownerType = $this->readPublicScalar($subject, 'owner_type') ?? $this->readPublicScalar($subject, 'ownerType');
+        $ownerId = $this->readPublicScalar($subject, 'owner_id') ?? $this->readPublicScalar($subject, 'ownerId');
+
+        $trackedProperty = $this->trackedPropertyResolver->resolveForOwnerReference(
+            $ownerType,
+            $ownerId,
+            null,
+            'affiliate_network',
+        );
+
+        if ($trackedProperty === null) {
+            return null;
+        }
+
+        return $this->ingestSignalEvent->handle($trackedProperty, [
+            'event_name' => $eventName,
+            'event_category' => $category,
+            'occurred_at' => $this->timestampValue(now()),
+            'revenue_minor' => 0,
+            'currency' => (string) config('signals.defaults.currency', 'MYR'),
+            'properties' => array_filter([
+                'subject_id' => $this->readPublicScalar($subject, 'id'),
+                'status' => $this->readPublicScalar($subject, 'status'),
+            ], static fn (mixed $value): bool => $value !== null),
+        ]);
+    }
+
     private function attributeValue(Model $model, string $attribute): mixed
     {
         if (! array_key_exists($attribute, $model->getAttributes())) {

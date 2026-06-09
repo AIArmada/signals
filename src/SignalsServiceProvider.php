@@ -6,7 +6,14 @@ namespace AIArmada\Signals;
 
 use AIArmada\Signals\Console\Commands\AggregateDailyMetricsCommand;
 use AIArmada\Signals\Console\Commands\ProcessSignalAlertsCommand;
+use AIArmada\Signals\Contracts\BrowserContextResolverInterface;
+use AIArmada\Signals\Contracts\ReportInterface;
 use AIArmada\Signals\Contracts\SignalLocationResolverContract;
+use AIArmada\Signals\Mappers\AffiliateEventMapper;
+use AIArmada\Signals\Mappers\CartEventMapper;
+use AIArmada\Signals\Mappers\CheckoutEventMapper;
+use AIArmada\Signals\Mappers\OrderEventMapper;
+use AIArmada\Signals\Mappers\VoucherEventMapper;
 use AIArmada\Signals\Models\SavedSignalReport;
 use AIArmada\Signals\Models\SignalAlertLog;
 use AIArmada\Signals\Models\SignalAlertRule;
@@ -18,8 +25,18 @@ use AIArmada\Signals\Models\SignalInteractionRule;
 use AIArmada\Signals\Models\SignalSegment;
 use AIArmada\Signals\Models\SignalSession;
 use AIArmada\Signals\Models\TrackedProperty;
+use AIArmada\Signals\Reports\ReportRegistry;
+use AIArmada\Signals\Services\AcquisitionReportService;
 use AIArmada\Signals\Services\CommerceSignalsRecorder;
+use AIArmada\Signals\Services\ContentPerformanceReportService;
+use AIArmada\Signals\Services\ConversionFunnelReportService;
+use AIArmada\Signals\Services\DevicesReportService;
 use AIArmada\Signals\Services\Geocoders\NominatimGeocoder;
+use AIArmada\Signals\Services\GoalsReportService;
+use AIArmada\Signals\Services\JourneyReportService;
+use AIArmada\Signals\Services\LiveActivityReportService;
+use AIArmada\Signals\Services\PageViewReportService;
+use AIArmada\Signals\Services\RetentionReportService;
 use AIArmada\Signals\Services\SignalAlertDispatcher;
 use AIArmada\Signals\Services\SignalAlertEvaluator;
 use AIArmada\Signals\Services\SignalLocationResolverPipeline;
@@ -28,6 +45,7 @@ use AIArmada\Signals\Services\SignalsDashboardService;
 use AIArmada\Signals\Services\TrackedPropertyResolver;
 use AIArmada\Signals\Support\Browser\InjectSignalsTrackerIntoHtmlResponse;
 use AIArmada\Signals\Support\Browser\SignalsBrowserContextManager;
+use AIArmada\Signals\Support\Browser\SignalsBrowserContextResolver;
 use AIArmada\Signals\Support\Browser\SignalsTrackerRenderer;
 use AIArmada\Signals\Support\CommerceSignalsIntegrationRegistrar;
 use AIArmada\Signals\Support\Http\Middleware\BootstrapSignalsBrowserContext;
@@ -74,6 +92,11 @@ final class SignalsServiceProvider extends PackageServiceProvider
 
             return $pipeline;
         });
+
+        $this->app->bind(BrowserContextResolverInterface::class, SignalsBrowserContextResolver::class);
+
+        $this->registerMappers();
+        $this->registerReports();
     }
 
     public function packageBooted(): void
@@ -83,6 +106,206 @@ final class SignalsServiceProvider extends PackageServiceProvider
         $this->registerBrowserMiddleware();
         $this->registerBrowserAutoInjection();
         app(CommerceSignalsIntegrationRegistrar::class)->boot();
+    }
+
+    private function registerMappers(): void
+    {
+        $this->app->tag([
+            OrderEventMapper::class,
+            CartEventMapper::class,
+            VoucherEventMapper::class,
+            CheckoutEventMapper::class,
+            AffiliateEventMapper::class,
+        ], 'signals.event_mappers');
+    }
+
+    private function registerReports(): void
+    {
+        $this->app->singleton(ReportRegistry::class, function ($app): ReportRegistry {
+            $registry = new ReportRegistry;
+
+            $registry->register(new class($app->make(AcquisitionReportService::class)) implements ReportInterface
+            {
+                public function __construct(private AcquisitionReportService $service) {}
+
+                public function type(): string
+                {
+                    return 'acquisition';
+                }
+
+                public function name(): string
+                {
+                    return 'Acquisition';
+                }
+
+                public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null): array
+                {
+                    return $this->service->summary($trackedPropertyId, $from, $until);
+                }
+            });
+
+            $registry->register(new class($app->make(ConversionFunnelReportService::class)) implements ReportInterface
+            {
+                public function __construct(private ConversionFunnelReportService $service) {}
+
+                public function type(): string
+                {
+                    return 'conversion_funnel';
+                }
+
+                public function name(): string
+                {
+                    return 'Conversion Funnel';
+                }
+
+                public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null): array
+                {
+                    return $this->service->summary($trackedPropertyId, $from, $until);
+                }
+            });
+
+            $registry->register(new class($app->make(RetentionReportService::class)) implements ReportInterface
+            {
+                public function __construct(private RetentionReportService $service) {}
+
+                public function type(): string
+                {
+                    return 'retention';
+                }
+
+                public function name(): string
+                {
+                    return 'Retention';
+                }
+
+                public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null): array
+                {
+                    return $this->service->summary($trackedPropertyId, $from, $until);
+                }
+            });
+
+            $registry->register(new class($app->make(JourneyReportService::class)) implements ReportInterface
+            {
+                public function __construct(private JourneyReportService $service) {}
+
+                public function type(): string
+                {
+                    return 'journey';
+                }
+
+                public function name(): string
+                {
+                    return 'Journey';
+                }
+
+                public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null): array
+                {
+                    return $this->service->summary($trackedPropertyId, $from, $until);
+                }
+            });
+
+            $registry->register(new class($app->make(PageViewReportService::class)) implements ReportInterface
+            {
+                public function __construct(private PageViewReportService $service) {}
+
+                public function type(): string
+                {
+                    return 'page_view';
+                }
+
+                public function name(): string
+                {
+                    return 'Page Views';
+                }
+
+                public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null): array
+                {
+                    return $this->service->summary($trackedPropertyId, $from, $until);
+                }
+            });
+
+            $registry->register(new class($app->make(ContentPerformanceReportService::class)) implements ReportInterface
+            {
+                public function __construct(private ContentPerformanceReportService $service) {}
+
+                public function type(): string
+                {
+                    return 'content_performance';
+                }
+
+                public function name(): string
+                {
+                    return 'Content Performance';
+                }
+
+                public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null): array
+                {
+                    return $this->service->summary($trackedPropertyId, $from, $until);
+                }
+            });
+
+            $registry->register(new class($app->make(DevicesReportService::class)) implements ReportInterface
+            {
+                public function __construct(private DevicesReportService $service) {}
+
+                public function type(): string
+                {
+                    return 'devices';
+                }
+
+                public function name(): string
+                {
+                    return 'Devices';
+                }
+
+                public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null): array
+                {
+                    return $this->service->summary($trackedPropertyId, $from, $until);
+                }
+            });
+
+            $registry->register(new class($app->make(GoalsReportService::class)) implements ReportInterface
+            {
+                public function __construct(private GoalsReportService $service) {}
+
+                public function type(): string
+                {
+                    return 'goals';
+                }
+
+                public function name(): string
+                {
+                    return 'Goals';
+                }
+
+                public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null): array
+                {
+                    return $this->service->summary($trackedPropertyId, $from, $until);
+                }
+            });
+
+            $registry->register(new class($app->make(LiveActivityReportService::class)) implements ReportInterface
+            {
+                public function __construct(private LiveActivityReportService $service) {}
+
+                public function type(): string
+                {
+                    return 'live_activity';
+                }
+
+                public function name(): string
+                {
+                    return 'Live Activity';
+                }
+
+                public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null): array
+                {
+                    return $this->service->summary($trackedPropertyId, $from, $until);
+                }
+            });
+
+            return $registry;
+        });
     }
 
     private function registerMorphMap(): void

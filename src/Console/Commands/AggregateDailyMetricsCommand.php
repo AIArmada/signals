@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Console\Commands;
 
-use AIArmada\CommerceSupport\Support\OwnerContext;
-use AIArmada\CommerceSupport\Support\OwnerTuple\OwnerTupleColumns;
-use AIArmada\CommerceSupport\Support\OwnerTuple\OwnerTupleParser;
+use AIArmada\CommerceSupport\Support\OwnerBatchRunner;
 use AIArmada\Signals\Models\TrackedProperty;
 use AIArmada\Signals\Services\SignalMetricsAggregator;
 use Illuminate\Console\Command;
@@ -24,34 +22,14 @@ final class AggregateDailyMetricsCommand extends Command
 
     public function handle(SignalMetricsAggregator $aggregator): int
     {
-        if ((bool) config('signals.owner.enabled', true) && OwnerContext::resolve() === null) {
-            $owners = TrackedProperty::query()
-                ->withoutOwnerScope()
-                ->select(['owner_type', 'owner_id'])
-                ->distinct()
-                ->get();
+        $runner = new OwnerBatchRunner(
+            TrackedProperty::class,
+            ['enabled' => 'signals.owner.enabled'],
+        );
 
-            if ($owners->isEmpty()) {
-                $this->runAggregation($aggregator);
-
-                return self::SUCCESS;
-            }
-
-            $columns = OwnerTupleColumns::forModelClass(TrackedProperty::class);
-
-            foreach ($owners as $row) {
-                $tuple = OwnerTupleParser::fromRow($row, $columns);
-                $owner = $tuple->toOwnerModel();
-
-                OwnerContext::withOwner($owner, function () use ($aggregator): void {
-                    $this->runAggregation($aggregator);
-                });
-            }
-
-            return self::SUCCESS;
-        }
-
-        $this->runAggregation($aggregator);
+        $runner->run(function () use ($aggregator): void {
+            $this->runAggregation($aggregator);
+        });
 
         return self::SUCCESS;
     }

@@ -10,10 +10,15 @@ use AIArmada\Signals\Models\SignalAlertRule;
 use AIArmada\Signals\Models\SignalDailyMetric;
 use AIArmada\Signals\Models\SignalIdentity;
 use AIArmada\Signals\Models\TrackedProperty;
+use AIArmada\Signals\Reports\ReportRegistry;
 use Carbon\CarbonImmutable;
 
 final class SignalsDashboardService
 {
+    public function __construct(
+        private readonly ReportRegistry $reportRegistry,
+    ) {}
+
     /**
      * @return array{tracked_properties:int,identities:int,sessions:int,events:int,conversions:int,revenue_minor:int,active_alert_rules:int,unread_alerts:int}
      */
@@ -87,6 +92,18 @@ final class SignalsDashboardService
                 ->values()
                 ->all();
         });
+    }
+
+    public function availableReports(): array
+    {
+        return $this->reportRegistry->options();
+    }
+
+    public function report(string $type, ?string $trackedPropertyId = null, ?string $from = null, ?string $until = null): array
+    {
+        $report = $this->reportRegistry->get($type);
+
+        return $report->summary($trackedPropertyId, $from, $until);
     }
 
     private function withResolvedOwnerOrExplicitGlobal(callable $callback): mixed

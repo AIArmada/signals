@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace AIArmada\Signals\Support\Browser;
 
 use AIArmada\CommerceSupport\Support\OwnerContext;
-use AIArmada\Growth\Support\ExperimentContextManager;
+use AIArmada\Growth\Support\Context\ExperimentContextManager;
 use AIArmada\Signals\Models\SignalInteractionRule;
 use AIArmada\Signals\Models\TrackedProperty;
 use AIArmada\Signals\Services\TrackedPropertyResolver;

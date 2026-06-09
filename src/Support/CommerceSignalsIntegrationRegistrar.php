@@ -6,6 +6,8 @@ namespace AIArmada\Signals\Support;
 
 use AIArmada\Signals\Listeners\RecordAffiliateAttributedSignal;
 use AIArmada\Signals\Listeners\RecordAffiliateConversionRecordedSignal;
+use AIArmada\Signals\Listeners\RecordApplicationApprovedSignal;
+use AIArmada\Signals\Listeners\RecordApplicationSubmittedSignal;
 use AIArmada\Signals\Listeners\RecordCartAbandonedSignal;
 use AIArmada\Signals\Listeners\RecordCartCheckoutStartedSignal;
 use AIArmada\Signals\Listeners\RecordCartClearedSignal;
@@ -15,6 +17,9 @@ use AIArmada\Signals\Listeners\RecordCartSnapshotSyncedSignal;
 use AIArmada\Signals\Listeners\RecordCheckoutCompletedSignal;
 use AIArmada\Signals\Listeners\RecordCheckoutStartedSignal;
 use AIArmada\Signals\Listeners\RecordHighValueCartDetectedSignal;
+use AIArmada\Signals\Listeners\RecordNetworkConversionRecordedSignal;
+use AIArmada\Signals\Listeners\RecordOfferCreatedSignal;
+use AIArmada\Signals\Listeners\RecordOfferUpdatedSignal;
 use AIArmada\Signals\Listeners\RecordOrderPaidSignal;
 use AIArmada\Signals\Listeners\RecordOrderRefundedSignal;
 use AIArmada\Signals\Listeners\RecordVoucherAppliedSignal;
@@ -26,6 +31,7 @@ final class CommerceSignalsIntegrationRegistrar
     public function boot(): void
     {
         $this->bootAffiliatesIntegration();
+        $this->bootAffiliateNetworkIntegration();
         $this->bootCartIntegration();
         $this->bootFilamentCartIntegration();
         $this->bootCheckoutIntegration();
@@ -140,6 +146,33 @@ final class CommerceSignalsIntegrationRegistrar
 
         if (config('signals.integrations.vouchers.listen_for_removed', true)) {
             $this->listenIfAvailable('AIArmada\\Vouchers\\Events\\VoucherRemoved', RecordVoucherRemovedSignal::class);
+        }
+    }
+
+    private function bootAffiliateNetworkIntegration(): void
+    {
+        if (! config('signals.integrations.affiliate_network.enabled', true)) {
+            return;
+        }
+
+        if (config('signals.integrations.affiliate_network.listen_for_offer_created', true)) {
+            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\OfferCreated', RecordOfferCreatedSignal::class);
+        }
+
+        if (config('signals.integrations.affiliate_network.listen_for_offer_updated', true)) {
+            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\OfferUpdated', RecordOfferUpdatedSignal::class);
+        }
+
+        if (config('signals.integrations.affiliate_network.listen_for_application_submitted', true)) {
+            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\ApplicationSubmitted', RecordApplicationSubmittedSignal::class);
+        }
+
+        if (config('signals.integrations.affiliate_network.listen_for_application_approved', true)) {
+            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\ApplicationApproved', RecordApplicationApprovedSignal::class);
+        }
+
+        if (config('signals.integrations.affiliate_network.listen_for_network_conversion_recorded', true)) {
+            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\NetworkConversionRecorded', RecordNetworkConversionRecordedSignal::class);
         }
     }
 

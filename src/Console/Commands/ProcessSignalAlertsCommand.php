@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Console\Commands;
 
-use AIArmada\CommerceSupport\Support\OwnerContext;
-use AIArmada\CommerceSupport\Support\OwnerTuple\OwnerTupleColumns;
-use AIArmada\CommerceSupport\Support\OwnerTuple\OwnerTupleParser;
+use AIArmada\CommerceSupport\Support\OwnerBatchRunner;
 use AIArmada\Signals\Models\SignalAlertRule;
 use AIArmada\Signals\Services\SignalAlertDispatcher;
 use AIArmada\Signals\Services\SignalAlertEvaluator;
@@ -45,39 +43,16 @@ final class ProcessSignalAlertsCommand extends Command
      */
     private function processForOwners(?string $ruleId, bool $dryRun): array
     {
-        if (! SignalAlertRule::ownerScopingEnabled() || OwnerContext::resolve() !== null) {
-            return $this->processScoped($ruleId, $dryRun);
-        }
+        $runner = new OwnerBatchRunner(
+            SignalAlertRule::class,
+            ['enabled' => 'signals.owner.enabled'],
+        );
 
-        $owners = SignalAlertRule::query()
-            ->withoutOwnerScope()
-            ->select(['owner_type', 'owner_id'])
-            ->distinct()
-            ->get();
-
-        if ($owners->isEmpty()) {
-            return $this->processScoped($ruleId, $dryRun);
-        }
-
-        $totals = ['processed' => 0, 'skipped' => 0, 'dispatched' => 0];
-
-        $columns = OwnerTupleColumns::forModelClass(SignalAlertRule::class);
-
-        foreach ($owners as $row) {
-            $tuple = OwnerTupleParser::fromRow($row, $columns);
-            $owner = $tuple->toOwnerModel();
-
-            $result = OwnerContext::withOwner(
-                $owner,
-                fn (): array => $this->processScoped($ruleId, $dryRun)
-            );
-
-            $totals['processed'] += $result['processed'];
-            $totals['skipped'] += $result['skipped'];
-            $totals['dispatched'] += $result['dispatched'];
-        }
-
-        return $totals;
+        return $runner->run(fn (): array => $this->processScoped($ruleId, $dryRun)) ?? [
+            'processed' => 0,
+            'skipped' => 0,
+            'dispatched' => 0,
+        ];
     }
 
     /**

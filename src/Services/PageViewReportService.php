@@ -7,6 +7,7 @@ namespace AIArmada\Signals\Services;
 use AIArmada\Signals\Models\SignalEvent;
 use AIArmada\Signals\Models\TrackedProperty;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 final class PageViewReportService
 {
@@ -30,6 +31,32 @@ final class PageViewReportService
             ->with('trackedProperty')
             ->groupBy('tracked_property_id')
             ->groupBy('path');
+    }
+
+    /**
+     * @return array{total_page_views: int, total_visitors: int, total_pages: int}
+     */
+    public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null): array
+    {
+        $query = $this->baseQuery($trackedPropertyId, $from, $until);
+
+        return [
+            'total_page_views' => (int) (clone $query)->count(),
+            'total_visitors' => (int) (clone $query)->distinct()->count('signal_identity_id'),
+            'total_pages' => (int) (clone $query)->distinct()->count(DB::raw("COALESCE(path, '/')")),
+        ];
+    }
+
+    /**
+     * @return Builder<SignalEvent>
+     */
+    private function baseQuery(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null): Builder
+    {
+        return $this->segmentReportFilter->applyToEventQuery(SignalEvent::query(), null)
+            ->where('event_category', 'page_view')
+            ->when($trackedPropertyId !== null, fn (Builder $q): Builder => $q->where('tracked_property_id', $trackedPropertyId))
+            ->when($from !== null, fn (Builder $q): Builder => $q->where('occurred_at', '>=', $from))
+            ->when($until !== null, fn (Builder $q): Builder => $q->where('occurred_at', '<=', $until));
     }
 
     /**

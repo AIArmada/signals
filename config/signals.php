@@ -268,6 +268,14 @@ return [
             'conversion_event_name' => 'affiliate.conversion.recorded',
             'conversion_event_category' => 'conversion',
         ],
+        'affiliate_network' => [
+            'enabled' => true,
+            'listen_for_offer_created' => true,
+            'listen_for_offer_updated' => true,
+            'listen_for_application_submitted' => true,
+            'listen_for_application_approved' => true,
+            'listen_for_network_conversion_recorded' => true,
+        ],
     ],
 
     /* HTTP */
