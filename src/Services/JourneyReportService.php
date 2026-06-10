@@ -31,7 +31,7 @@ final class JourneyReportService
                 ->whereNotNull('exit_path')
                 ->distinct('exit_path')
                 ->count('exit_path'),
-            'bounced_sessions' => (int) (clone $query)->where('is_bounce', true)->count(),
+            'bounced_sessions' => (int) (clone $query)->whereNotNull('bounced_at')->count(),
             'avg_duration_seconds' => round((float) (((clone $query)->avg('duration_milliseconds') ?? 0) / 1000), 2),
         ];
     }
@@ -52,7 +52,7 @@ final class JourneyReportService
             ->selectRaw("'{$this->escapeSqlLiteral($this->getBreakdownLabel($savedReportId))}' as journey_breakdown_label")
             ->selectRaw($this->breakdownValueExpression($dimension) . ' as journey_breakdown_value')
             ->selectRaw('COUNT(*) as sessions')
-            ->selectRaw('SUM(CASE WHEN is_bounce = true THEN 1 ELSE 0 END) as bounced_sessions')
+            ->selectRaw('COUNT(bounced_at) as bounced_sessions')
             ->selectRaw('AVG(duration_milliseconds) / 1000 as avg_duration_seconds')
             ->selectRaw('MAX(started_at) as last_started_at')
             ->with('trackedProperty')

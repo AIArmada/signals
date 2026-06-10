@@ -207,7 +207,7 @@ final class SignalAlertRule extends Model implements Auditable
             'timeframe_minutes' => 'integer',
             'cooldown_minutes' => 'integer',
             'priority' => 'integer',
-            'last_triggered_at' => 'datetime',
+            'last_triggered_at' => 'immutable_datetime',
             'is_active' => 'boolean',
         ];
     }

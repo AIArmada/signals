@@ -109,7 +109,7 @@ final class DevicesReportService
             'browsers' => (int) (clone $base)->whereNotNull('browser')->distinct()->count('browser'),
             'operating_systems' => (int) (clone $base)->whereNotNull('os')->distinct()->count('os'),
             'brands' => (int) (clone $base)->whereNotNull('device_brand')->distinct()->count('device_brand'),
-            'bots' => (int) (clone $base)->where('is_bot', true)->count(),
+            'bots' => (int) (clone $base)->whereNotNull('identified_as_bot_at')->count(),
         ];
     }
 
@@ -149,7 +149,7 @@ final class DevicesReportService
             )
             ->when(
                 $excludeBots,
-                fn (Builder $query): Builder => $query->where('is_bot', false)
+                fn (Builder $query): Builder => $query->whereNull('identified_as_bot_at')
             );
     }
 }

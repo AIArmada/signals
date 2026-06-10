@@ -40,7 +40,7 @@ final class SignalMetricsAggregator
                     ->distinct('signal_identity_id')
                     ->count('signal_identity_id'),
                 'sessions' => $sessions->count(),
-                'bounced_sessions' => (clone $sessions)->where('is_bounce', true)->count(),
+                'bounced_sessions' => (clone $sessions)->whereNotNull('bounced_at')->count(),
                 'page_views' => (clone $events)->where('event_category', 'page_view')->count(),
                 'events' => $events->count(),
                 'conversions' => (clone $events)->where('event_category', 'conversion')->count(),

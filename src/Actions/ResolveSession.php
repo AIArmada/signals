@@ -69,6 +69,8 @@ final class ResolveSession
             }
         }
 
+        $isBot = is_bool($payload['is_bot'] ?? null) ? $payload['is_bot'] : ($parsed['is_bot'] ?? false);
+
         $storeRaw = (bool) config('signals.features.ua_parsing.store_raw', true);
 
         $session->fill([
@@ -84,7 +86,7 @@ final class ResolveSession
             'browser_version' => $payload['browser_version'] ?? ($parsed['browser_version'] ?? $session->browser_version),
             'os' => $payload['os'] ?? ($parsed['os'] ?? $session->os),
             'os_version' => $payload['os_version'] ?? ($parsed['os_version'] ?? $session->os_version),
-            'is_bot' => $parsed['is_bot'],
+            'identified_as_bot_at' => $isBot ? CarbonImmutable::now() : null,
             'user_agent' => $session->user_agent ?? ($rawUserAgent !== null && $storeRaw ? $rawUserAgent : null),
             'ip_address' => $session->ip_address ?? $capturedIp,
             'referrer' => $session->referrer ?? ($payload['referrer'] ?? null),
@@ -96,7 +98,7 @@ final class ResolveSession
         ]);
 
         if (! $session->exists) {
-            $session->is_bounce = true;
+            $session->bounced_at = CarbonImmutable::now();
         }
 
         $this->syncOwnerFromProperty($session, $trackedProperty);
@@ -131,7 +133,7 @@ final class ResolveSession
             'browser_version' => $payload['browser_version'] ?? ($parsed['browser_version'] ?? $session->browser_version),
             'os' => $payload['os'] ?? ($parsed['os'] ?? $session->os),
             'os_version' => $payload['os_version'] ?? ($parsed['os_version'] ?? $session->os_version),
-            'is_bot' => $parsed['is_bot'],
+            'identified_as_bot_at' => $isBot ? CarbonImmutable::now() : null,
             'user_agent' => $session->user_agent ?? ($rawUserAgent !== null && $storeRaw ? $rawUserAgent : null),
             'ip_address' => $session->ip_address ?? $capturedIp,
             'referrer' => $session->referrer ?? ($payload['referrer'] ?? null),

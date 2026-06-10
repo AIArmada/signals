@@ -27,11 +27,10 @@ return new class extends Migration
             $table->{$jsonColumnType}('context')->nullable();
             $table->{$jsonColumnType}('channels_notified')->nullable();
             $table->{$jsonColumnType}('delivery_results')->nullable();
-            $table->boolean('is_read')->default(false);
             $table->timestampTz('read_at')->nullable();
             $table->timestampsTz();
 
-            $table->index(['signal_alert_rule_id', 'is_read']);
+            $table->index(['signal_alert_rule_id', 'read_at']);
             $table->index('tracked_property_id');
             $table->index(['severity', 'created_at']);
         });

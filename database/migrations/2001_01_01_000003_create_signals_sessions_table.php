@@ -52,8 +52,8 @@ return new class extends Migration
             $table->string('utm_campaign')->nullable();
             $table->string('utm_content')->nullable();
             $table->string('utm_term')->nullable();
-            $table->boolean('is_bounce')->default(false);
-            $table->boolean('is_bot')->default(false);
+            $table->timestampTz('bounced_at')->nullable();
+            $table->timestampTz('identified_as_bot_at')->nullable();
             $table->text('user_agent')->nullable();
             $table->string('ip_address', 45)->nullable();
             $table->timestampsTz();

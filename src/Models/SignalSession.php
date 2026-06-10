@@ -49,7 +49,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $browser_version
  * @property string|null $os
  * @property string|null $os_version
- * @property bool $is_bot
+ * @property CarbonImmutable|null $identified_as_bot_at
  * @property string|null $user_agent
  * @property string|null $ip_address
  * @property string|null $referrer
@@ -58,7 +58,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $utm_campaign
  * @property string|null $utm_content
  * @property string|null $utm_term
- * @property bool $is_bounce
+ * @property CarbonImmutable|null $bounced_at
  * @property-read TrackedProperty $trackedProperty
  * @property-read SignalIdentity|null $identity
  * @property-read Collection<int, SignalEvent> $events
@@ -105,7 +105,7 @@ final class SignalSession extends Model
         'browser_version',
         'os',
         'os_version',
-        'is_bot',
+        'identified_as_bot_at',
         'user_agent',
         'ip_address',
         'referrer',
@@ -114,7 +114,7 @@ final class SignalSession extends Model
         'utm_campaign',
         'utm_content',
         'utm_term',
-        'is_bounce',
+        'bounced_at',
         'owner_type',
         'owner_id',
     ];
@@ -124,8 +124,8 @@ final class SignalSession extends Model
         'started_at' => 'immutable_datetime',
         'ended_at' => 'immutable_datetime',
         'duration_milliseconds' => 'integer',
-        'is_bounce' => 'boolean',
-        'is_bot' => 'boolean',
+        'bounced_at' => 'immutable_datetime',
+        'identified_as_bot_at' => 'immutable_datetime',
         'latitude' => 'float',
         'longitude' => 'float',
         'accuracy_meters' => 'integer',

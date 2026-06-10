@@ -30,7 +30,6 @@ use RuntimeException;
  * @property array<string, mixed>|null $context
  * @property array<int, string>|null $channels_notified
  * @property array<string, mixed>|null $delivery_results
- * @property bool $is_read
  * @property Carbon|null $read_at
  * @property-read SignalAlertRule $alertRule
  * @property-read TrackedProperty|null $trackedProperty
@@ -58,7 +57,6 @@ final class SignalAlertLog extends Model
         'context',
         'channels_notified',
         'delivery_results',
-        'is_read',
         'read_at',
         'owner_type',
         'owner_id',
@@ -90,18 +88,12 @@ final class SignalAlertLog extends Model
 
     public function markAsRead(): void
     {
-        $this->update([
-            'is_read' => true,
-            'read_at' => now(),
-        ]);
+        $this->update(['read_at' => now()]);
     }
 
     public function markAsUnread(): void
     {
-        $this->update([
-            'is_read' => false,
-            'read_at' => null,
-        ]);
+        $this->update(['read_at' => null]);
     }
 
     public static function ownerScopingEnabled(): bool
@@ -156,8 +148,7 @@ final class SignalAlertLog extends Model
             'context' => 'array',
             'channels_notified' => 'array',
             'delivery_results' => 'array',
-            'is_read' => 'boolean',
-            'read_at' => 'datetime',
+            'read_at' => 'immutable_datetime',
         ];
     }
 }
