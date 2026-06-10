@@ -212,6 +212,54 @@ $recorder->recordAffiliateConversionRecorded($conversion);
 
 The `signals.recording.events.*` toggles let you disable selected built-in recorder outputs without removing the surrounding integration.
 
+## Actions
+
+Signals provides reusable Laravel Actions for core ingest, session, and alert operations:
+
+```php
+use AIArmada\Signals\Actions\IngestSignalEvent;
+use AIArmada\Signals\Actions\ResolveSession;
+use AIArmada\Signals\Actions\EvaluateAlertRules;
+use AIArmada\Signals\Models\TrackedProperty;
+
+// Ingest a signal event into a tracked property
+$event = IngestSignalEvent::run($trackedProperty, [
+    'event_name' => 'checkout.completed',
+    'event_category' => 'checkout',
+    'external_id' => 'user-123',
+    'revenue_minor' => 14900,
+    'currency' => 'MYR',
+]);
+
+// Resolve or create a session for a tracked property
+$session = ResolveSession::run($trackedProperty, $identity, [
+    'session_identifier' => 'sig_session_1',
+    'path' => '/checkout',
+]);
+
+// Evaluate active alert rules
+$result = EvaluateAlertRules::run(); // ['processed' => 5, 'skipped' => 1, 'dispatched' => 2]
+$result = EvaluateAlertRules::run(trackedPropertyId: $property->id, dryRun: true);
+```
+
+- **`IngestSignalEvent`** — handles identity resolution, session stitching, property allowlisting, idempotency via `source_event_id`, and optional on-ingest alert evaluation.
+- **`ResolveSession`** — resolves or creates sessions with device/UA parsing, IP capture (Cloudflare-aware), country detection, and attribution enrichment (UTM/referrer).
+- **`EvaluateAlertRules`** — iterates active `SignalAlertRule` records through the `SignalAlertEvaluator` and dispatches matched alerts via the `SignalAlertDispatcher`.
+
+### Mappers
+
+Commerce event mappers implement `MapCommerceEventToSignalInterface` and translate domain events into signal event payloads. They are tagged with `signals.event_mappers` and consumed by `RecordSignalFromEvent`:
+
+| Mapper | Handled Events |
+|---|---|
+| `CartEventMapper` | `ItemAdded`, `ItemRemoved`, `CartCleared` |
+| `CheckoutEventMapper` | `CheckoutStarted`, `CheckoutCompleted` |
+| `OrderEventMapper` | `OrderPaid`, `OrderCompleted`, `OrderCanceled`, `OrderRefunded` |
+| `VoucherEventMapper` | `VoucherApplied`, `VoucherRemoved` |
+| `AffiliateEventMapper` | Affiliate attributed/conversion, offer created/updated, application submitted/approved, network conversion |
+
+Register a custom mapper by implementing `MapCommerceEventToSignalInterface` and tagging the service with `signals.event_mappers` in your service provider.
+
 ## Aggregation and Alerting
 
 ### Aggregate Metrics

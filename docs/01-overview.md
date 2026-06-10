@@ -30,10 +30,14 @@ The `aiarmada/signals` package is the analytics foundation for Commerce. It owns
 
 ## Main models services or surfaces
 
+- **Actions** — `IngestSignalEvent`, `ResolveSession`, `EvaluateAlertRules`, `IdentifySignalIdentity`, `CaptureSignalPageView`, `CaptureSignalGeolocation`, `ServeSignalsTracker`, and alert-read actions
+- **Contracts** — `MapCommerceEventToSignalInterface`, `BrowserContextResolverInterface`, `ReportInterface`, `ReverseGeocoderContract`, `SignalLocationResolverContract`
+- **Mappers** — `CartEventMapper`, `CheckoutEventMapper`, `OrderEventMapper`, `VoucherEventMapper`, `AffiliateEventMapper` (tagged `signals.event_mappers`)
 - **Ingestion surface** — HTTP actions for identity, page-view, custom-event capture, geolocation capture, and tracker-script delivery
 - **Browser surface** — browser-context cookies, optional automatic tracker injection, and Blade `@signalsTracker` rendering
-- **Models and services** — signals domain models, reporting, dashboards, alerting, ingestion helpers, route catalogs, and daily aggregation
-- **Integration surface** — package listeners and registrar hooks for cart, checkout, orders, vouchers, and affiliates
+- **Models and services** — signals domain models, report services (`PageViewReportService`, `SignalsDashboardService`, funnel/acquisition/journey/retention/content/goals/live/devices), alerting, ingestion helpers, route catalogs, and daily aggregation
+- **ReportRegistry** — central registry for `ReportInterface` implementations, used by `SignalsDashboardService` and Filament admin surfaces
+- **Integration surface** — `CommerceSignalsRecorder`, `RecordSignalFromEvent` listener, and mappers for cart, checkout, orders, vouchers, and affiliates
 
 ## Owner scoping and security notes
 
@@ -78,12 +82,17 @@ When browser integration is enabled, Signals can also auto-create a browser trac
 
 ```text
 src/
-├── Actions/                 # HTTP actions for ingestion and tracker script
+├── Actions/                 # Laravel Actions for ingest, session, alerts, identity, page views
 ├── Console/Commands/        # Daily aggregation + alert processing
+├── Contracts/               # MapCommerceEventToSignalInterface, BrowserContextResolverInterface, ReportInterface
+├── Data/                    # Spatie DTOs
+├── Jobs/                    # Queued jobs (reverse geocode, alert evaluation)
 ├── Listeners/               # Commerce integration listeners
+├── Mappers/                 # Commerce event mappers (cart, checkout, order, voucher, affiliate)
 ├── Models/                  # Signals domain models
-├── Services/                # Reporting, dashboards, alerting, ingestion helpers
-├── Support/                 # Integration registrar and helpers
+├── Reports/                 # ReportRegistry for pluggable report types
+├── Services/                # Reporting, dashboards, alerting, ingestion helpers, geocoding
+├── Support/                 # Browser context, CrossTenantQuery, integration registrar, middleware
 └── SignalsServiceProvider.php
 ```
 

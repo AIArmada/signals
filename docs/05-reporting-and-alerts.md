@@ -85,3 +85,37 @@ Named destinations from config are preferred. Inline destinations are ignored un
 ## Owner scoping
 
 Report, alert, and command paths are owner-scoped. Global rows require explicit global context for mutation.
+
+## ReportRegistry
+
+Signals uses a `ReportRegistry` to manage pluggable report types. Reports are registered in `SignalsServiceProvider` via anonymous classes implementing `ReportInterface`:
+
+| Report Type | Backing Service |
+|---|---|
+| `page_view` | `PageViewReportService` |
+| `conversion_funnel` | `ConversionFunnelReportService` |
+| `acquisition` | `AcquisitionReportService` |
+| `journey` | `JourneyReportService` |
+| `retention` | `RetentionReportService` |
+| `content_performance` | `ContentPerformanceReportService` |
+| `devices` | `DevicesReportService` |
+| `goals` | `GoalsReportService` |
+| `live_activity` | `LiveActivityReportService` |
+
+The registry is consumed by `SignalsDashboardService` and Filament admin surfaces. Each report implements `summary(?string $trackedPropertyId, ?string $from, ?string $until): array`, making the same data available outside the admin UI:
+
+```php
+use AIArmada\Signals\Reports\ReportRegistry;
+
+$registry = app(ReportRegistry::class);
+
+/** @var \AIArmada\Signals\Contracts\ReportInterface $report */
+$report = $registry->get('page_view');
+$summary = $report->summary(trackedPropertyId: $property->id);
+
+foreach ($registry->all() as $report) {
+    $data = $report->summary();
+}
+```
+
+To add a custom report, implement `ReportInterface` and register it on the `ReportRegistry` singleton in your service provider.
