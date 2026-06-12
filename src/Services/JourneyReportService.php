@@ -150,7 +150,7 @@ final class JourneyReportService
         return match ($dimension) {
             'entry_path' => "COALESCE(entry_path, '(unknown)')",
             'exit_path' => "COALESCE(exit_path, '(unknown)')",
-            'country' => "COALESCE(country, '(unknown)')",
+            'country' => "COALESCE(country_code, '(unknown)')",
             'device_type' => "COALESCE(device_type, '(unknown)')",
             'browser' => "COALESCE(browser, '(unknown)')",
             'os' => "COALESCE(os, '(unknown)')",
@@ -166,7 +166,7 @@ final class JourneyReportService
         return match ($dimension) {
             'entry_path' => 'entry_path',
             'exit_path' => 'exit_path',
-            'country' => 'country',
+            'country' => 'country_code',
             'device_type' => 'device_type',
             'browser' => 'browser',
             'os' => 'os',

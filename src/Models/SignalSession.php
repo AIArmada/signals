@@ -83,7 +83,7 @@ final class SignalSession extends Model
         'duration_milliseconds',
         'entry_path',
         'exit_path',
-        'country',
+        'country_code',
         'country_source',
         'latitude',
         'longitude',

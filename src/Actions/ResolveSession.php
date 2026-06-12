@@ -77,7 +77,7 @@ final class ResolveSession
             'signal_identity_id' => $identity?->id,
             'entry_path' => $session->entry_path ?? ($payload['path'] ?? null),
             'exit_path' => $payload['path'] ?? $session->exit_path,
-            'country' => $session->country ?? $this->resolveCountry($request, $payload),
+            'country_code' => $session->country_code ?? $this->resolveCountryCode($request, $payload),
             'country_source' => $session->country_source ?? $this->resolveCountrySource($request, $payload),
             'device_type' => $payload['device_type'] ?? ($parsed['device_type'] ?? $session->device_type),
             'device_brand' => $payload['device_brand'] ?? ($parsed['device_brand'] ?? $session->device_brand),
@@ -124,7 +124,7 @@ final class ResolveSession
             'signal_identity_id' => $identity?->id,
             'entry_path' => $session->entry_path ?? ($payload['path'] ?? null),
             'exit_path' => $payload['path'] ?? $session->exit_path,
-            'country' => $session->country ?? $this->resolveCountry($request, $payload),
+            'country_code' => $session->country_code ?? $this->resolveCountryCode($request, $payload),
             'country_source' => $session->country_source ?? $this->resolveCountrySource($request, $payload),
             'device_type' => $payload['device_type'] ?? ($parsed['device_type'] ?? $session->device_type),
             'device_brand' => $payload['device_brand'] ?? ($parsed['device_brand'] ?? $session->device_brand),
@@ -167,7 +167,7 @@ final class ResolveSession
         $model->owner_id = $trackedProperty->owner_id;
     }
 
-    private function resolveCountry(?Request $request, array $payload): ?string
+    private function resolveCountryCode(?Request $request, array $payload): ?string
     {
         if ($request !== null) {
             $cfCountry = $request->header('CF-IPCountry');
@@ -180,7 +180,7 @@ final class ResolveSession
             }
         }
 
-        $payloadCountry = $payload['country'] ?? null;
+        $payloadCountry = $payload['country_code'] ?? null;
         if (is_string($payloadCountry) && preg_match('/^[A-Z]{2}$/', mb_strtoupper($payloadCountry))) {
             return mb_strtoupper($payloadCountry);
         }
@@ -201,7 +201,7 @@ final class ResolveSession
             }
         }
 
-        $payloadCountry = $payload['country'] ?? null;
+        $payloadCountry = $payload['country_code'] ?? null;
         if (is_string($payloadCountry) && $payloadCountry !== '') {
             return 'payload';
         }

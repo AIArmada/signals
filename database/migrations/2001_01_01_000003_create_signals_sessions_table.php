@@ -23,7 +23,7 @@ return new class extends Migration
             $table->unsignedBigInteger('duration_milliseconds')->default(0);
             $table->string('entry_path')->nullable();
             $table->string('exit_path')->nullable();
-            $table->string('country', 2)->nullable();
+            $table->string('country_code', 2)->nullable();
             $table->string('country_source', 50)->nullable();
             $table->decimal('latitude', 10, 7)->nullable();
             $table->decimal('longitude', 11, 7)->nullable();

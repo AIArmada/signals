@@ -111,7 +111,7 @@ final class IngestSignalEvent
             'path' => ['nullable', 'string', 'max:255'],
             'url' => ['nullable', 'string'],
             'referrer' => ['nullable', 'string'],
-            'country' => ['nullable', 'string', 'max:2'],
+            'country_code' => ['nullable', 'string', 'max:2'],
             'device_type' => ['nullable', 'string', 'max:50'],
             'browser' => ['nullable', 'string', 'max:100'],
             'os' => ['nullable', 'string', 'max:100'],
