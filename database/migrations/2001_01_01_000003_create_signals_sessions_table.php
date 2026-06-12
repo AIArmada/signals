@@ -53,6 +53,7 @@ return new class extends Migration
             $table->string('utm_content')->nullable();
             $table->string('utm_term')->nullable();
             $table->timestampTz('bounced_at')->nullable();
+            $table->boolean('is_bounce')->default(false);
             $table->timestampTz('identified_as_bot_at')->nullable();
             $table->text('user_agent')->nullable();
             $table->string('ip_address', 45)->nullable();
