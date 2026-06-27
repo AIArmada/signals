@@ -9,11 +9,6 @@ use AIArmada\Signals\Console\Commands\ProcessSignalAlertsCommand;
 use AIArmada\Signals\Contracts\BrowserContextResolverInterface;
 use AIArmada\Signals\Contracts\ReportInterface;
 use AIArmada\Signals\Contracts\SignalLocationResolverContract;
-use AIArmada\Signals\Mappers\AffiliateEventMapper;
-use AIArmada\Signals\Mappers\CartEventMapper;
-use AIArmada\Signals\Mappers\CheckoutEventMapper;
-use AIArmada\Signals\Mappers\OrderEventMapper;
-use AIArmada\Signals\Mappers\VoucherEventMapper;
 use AIArmada\Signals\Models\SavedSignalReport;
 use AIArmada\Signals\Models\SignalAlertLog;
 use AIArmada\Signals\Models\SignalAlertRule;
@@ -95,7 +90,6 @@ final class SignalsServiceProvider extends PackageServiceProvider
 
         $this->app->bind(BrowserContextResolverInterface::class, SignalsBrowserContextResolver::class);
 
-        $this->registerMappers();
         $this->registerReports();
     }
 
@@ -106,17 +100,6 @@ final class SignalsServiceProvider extends PackageServiceProvider
         $this->registerBrowserMiddleware();
         $this->registerBrowserAutoInjection();
         app(CommerceSignalsIntegrationRegistrar::class)->boot();
-    }
-
-    private function registerMappers(): void
-    {
-        $this->app->tag([
-            OrderEventMapper::class,
-            CartEventMapper::class,
-            VoucherEventMapper::class,
-            CheckoutEventMapper::class,
-            AffiliateEventMapper::class,
-        ], 'signals.event_mappers');
     }
 
     private function registerReports(): void

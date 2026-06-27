@@ -369,28 +369,3 @@ Browser, cart, and Filament cart integrations can auto-create deterministic trac
 ```
 
 `prefix` is the base path for all ingestion and tracker endpoints. `tracker_script` is the filename served at `{prefix}/{tracker_script}`. Override `middleware` to add rate limiting or custom guards.
-
-## Mappers
-
-Commerce event mappers translate domain events into signal event payloads. They implement `MapCommerceEventToSignalInterface` and are registered via the `signals.event_mappers` tag in the service provider:
-
-```php
-// SignalsServiceProvider
-$this->app->tag([
-    OrderEventMapper::class,
-    CartEventMapper::class,
-    VoucherEventMapper::class,
-    CheckoutEventMapper::class,
-    AffiliateEventMapper::class,
-], 'signals.event_mappers');
-```
-
-The `RecordSignalFromEvent` listener resolves the correct mapper for each dispatched event by iterating tagged services. Mappers are cached by event class after first resolution.
-
-To register a custom mapper, implement `MapCommerceEventToSignalInterface` and tag your service with `signals.event_mappers`:
-
-```php
-$this->app->tag(MyCustomMapper::class, 'signals.event_mappers');
-```
-
-When `handledEvents()` is defined on the mapper, the resolver checks all returned class names; otherwise it falls back to `handles()`. This lets a single mapper handle multiple event types, as `CartEventMapper` does for `ItemAdded`, `ItemRemoved`, and `CartCleared`.

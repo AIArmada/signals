@@ -246,20 +246,6 @@ $result = EvaluateAlertRules::run(trackedPropertyId: $property->id, dryRun: true
 - **`ResolveSession`** — resolves or creates sessions with device/UA parsing, IP capture (Cloudflare-aware), country detection, and attribution enrichment (UTM/referrer).
 - **`EvaluateAlertRules`** — iterates active `SignalAlertRule` records through the `SignalAlertEvaluator` and dispatches matched alerts via the `SignalAlertDispatcher`.
 
-### Mappers
-
-Commerce event mappers implement `MapCommerceEventToSignalInterface` and translate domain events into signal event payloads. They are tagged with `signals.event_mappers` and consumed by `RecordSignalFromEvent`:
-
-| Mapper | Handled Events |
-|---|---|
-| `CartEventMapper` | `ItemAdded`, `ItemRemoved`, `CartCleared` |
-| `CheckoutEventMapper` | `CheckoutStarted`, `CheckoutCompleted` |
-| `OrderEventMapper` | `OrderPaid`, `OrderCompleted`, `OrderCanceled`, `OrderRefunded` |
-| `VoucherEventMapper` | `VoucherApplied`, `VoucherRemoved` |
-| `AffiliateEventMapper` | Affiliate attributed/conversion, offer created/updated, application submitted/approved, network conversion |
-
-Register a custom mapper by implementing `MapCommerceEventToSignalInterface` and tagging the service with `signals.event_mappers` in your service provider.
-
 ## Aggregation and Alerting
 
 ### Aggregate Metrics
