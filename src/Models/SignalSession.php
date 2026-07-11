@@ -59,7 +59,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $utm_content
  * @property string|null $utm_term
  * @property CarbonImmutable|null $bounced_at
- * @property bool $is_bounce
  * @property-read TrackedProperty $trackedProperty
  * @property-read SignalIdentity|null $identity
  * @property-read Collection<int, SignalEvent> $events
@@ -116,7 +115,6 @@ final class SignalSession extends Model
         'utm_content',
         'utm_term',
         'bounced_at',
-        'is_bounce',
         'owner_type',
         'owner_id',
     ];
@@ -127,7 +125,6 @@ final class SignalSession extends Model
         'ended_at' => 'immutable_datetime',
         'duration_milliseconds' => 'integer',
         'bounced_at' => 'immutable_datetime',
-        'is_bounce' => 'boolean',
         'identified_as_bot_at' => 'immutable_datetime',
         'latitude' => 'float',
         'longitude' => 'float',
