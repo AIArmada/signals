@@ -11,7 +11,6 @@ Signals configuration lives in `config/signals.php`.
 ```php
 'database' => [
     'table_prefix' => 'signal_',
-    'json_column_type' => env('SIGNALS_JSON_COLUMN_TYPE', env('COMMERCE_JSON_COLUMN_TYPE', 'jsonb')),
     'tables' => [
         'tracked_properties' => 'signal_tracked_properties',
         'identities'         => 'signal_identities',
@@ -49,6 +48,17 @@ Table names can be overridden individually in `database.tables`. All tables defa
 ```
 
 `primary_outcome_event_name` controls which event is used for primary-outcome goal calculations. `starter_funnel` is the default funnel definition shown before the user configures a custom one.
+
+## Request Context Cookies
+
+```php
+'cookie' => [
+    'write_key_name' => env('SIGNALS_WRITE_KEY_COOKIE', 'swk'),
+    'session_key' => env('SIGNALS_SESSION_COOKIE', 'ssid'),
+],
+```
+
+These names are used when resolving a write key and session identifier from inbound requests. Headers remain supported as fallbacks.
 
 ## Recording
 
@@ -195,6 +205,8 @@ The default allowlist now includes Growth attribution keys such as `experiment_i
 ```
 
 Scheduled alert evaluation (`signals:process-alerts`) is the baseline. On-ingest evaluation is optional and queued by default. Named destinations in `destinations.*` are referenced by key in alert rules; inline destinations are ignored unless `allow_inline_destinations` is true.
+
+Webhook and Slack destinations must be public `http` or `https` URLs on standard ports. Credentials in URLs, private/reserved IP addresses, internal hostnames, and redirects are rejected to prevent server-side requests from reaching internal services.
 
 ## Integrations
 

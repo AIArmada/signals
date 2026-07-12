@@ -8,7 +8,6 @@ return [
     /* Database */
     'database' => [
         'table_prefix' => $tablePrefix,
-        'json_column_type' => env('SIGNALS_JSON_COLUMN_TYPE', env('COMMERCE_JSON_COLUMN_TYPE', 'jsonb')),
         'tables' => [
             'tracked_properties' => $tablePrefix . 'tracked_properties',
             'identities' => $tablePrefix . 'identities',
@@ -49,6 +48,12 @@ return [
             ],
         ],
         'session_duration_seconds' => 1800,
+    ],
+
+    /* Browser cookies used by request-side context resolution */
+    'cookie' => [
+        'write_key_name' => env('SIGNALS_WRITE_KEY_COOKIE', 'swk'),
+        'session_key' => env('SIGNALS_SESSION_COOKIE', 'ssid'),
     ],
 
     /* Recording toggles */

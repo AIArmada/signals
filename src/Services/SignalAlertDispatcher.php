@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Services;
 
+use AIArmada\CommerceSupport\Support\PublicHttpUrlGuard;
 use AIArmada\Signals\Models\SignalAlertLog;
 use AIArmada\Signals\Models\SignalAlertRule;
 use Illuminate\Support\Facades\Http;
@@ -12,6 +13,8 @@ use Throwable;
 
 final class SignalAlertDispatcher
 {
+    public function __construct(private readonly PublicHttpUrlGuard $urlGuard) {}
+
     /**
      * @param  array<string, mixed>  $context
      */
@@ -158,7 +161,9 @@ final class SignalAlertDispatcher
             return;
         }
 
-        Http::post($url, $this->webhookPayload($rule, $log, $message));
+        $this->urlGuard->assertAllowed($url);
+
+        Http::withoutRedirecting()->post($url, $this->webhookPayload($rule, $log, $message));
     }
 
     /**
@@ -172,7 +177,9 @@ final class SignalAlertDispatcher
             return;
         }
 
-        Http::post($url, [
+        $this->urlGuard->assertAllowed($url);
+
+        Http::withoutRedirecting()->post($url, [
             'text' => $message,
             'attachments' => [[
                 'title' => $rule->name,

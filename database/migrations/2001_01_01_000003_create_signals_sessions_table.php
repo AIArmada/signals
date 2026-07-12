@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $jsonColumnType = config('signals.database.json_column_type', commerce_json_column_type('signals', 'jsonb'));
+        $jsonColumnType = commerce_json_column_type('signals', 'jsonb');
 
         Schema::create(config('signals.database.tables.sessions', 'signal_sessions'), function (Blueprint $table) use ($jsonColumnType): void {
             $table->uuid('id')->primary();
