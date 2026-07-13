@@ -48,7 +48,7 @@ final class CommerceSignalsRecorder
                 'payment_gateway' => $this->stringValue($this->attributeValue($session, 'selected_payment_gateway')),
                 'growth_visitor_id' => $anonymousId,
             ]),
-        ]);
+        ], trusted: true);
     }
 
     public function recordCheckoutStarted(Model $session): ?SignalEvent
@@ -81,7 +81,7 @@ final class CommerceSignalsRecorder
                 'shipping_method' => $this->stringValue($this->attributeValue($session, 'selected_shipping_method')),
                 'growth_visitor_id' => $anonymousId,
             ]),
-        ]);
+        ], trusted: true);
     }
 
     public function recordOrderPaid(Model $order, ?string $transactionId = null, ?string $gateway = null): ?SignalEvent
@@ -117,7 +117,7 @@ final class CommerceSignalsRecorder
                 'transaction_id' => $transactionId,
                 'growth_visitor_id' => $anonymousId,
             ]),
-        ]);
+        ], trusted: true);
     }
 
     public function recordOrderRefunded(Model $order, int $amount, ?string $reason = null): ?SignalEvent
@@ -152,7 +152,7 @@ final class CommerceSignalsRecorder
                 'refund_reason' => $reason,
                 'growth_visitor_id' => $anonymousId,
             ]),
-        ]);
+        ], trusted: true);
     }
 
     public function recordCartItemAdded(object $cart, object $item): ?SignalEvent
@@ -312,7 +312,7 @@ final class CommerceSignalsRecorder
                 'landing_url' => $landingUrl,
                 'referrer_url' => $referrerUrl,
             ], static fn (mixed $value): bool => $value !== null),
-        ]);
+        ], trusted: true);
     }
 
     public function recordAffiliateConversionRecorded(object $conversion): ?SignalEvent
@@ -398,7 +398,7 @@ final class CommerceSignalsRecorder
                 'status' => $this->normalizeStateValue($conversionModel->getAttribute('status')),
                 'channel' => $this->stringValue($conversionModel->getAttribute('channel')),
             ], static fn (mixed $value): bool => $value !== null),
-        ]);
+        ], trusted: true);
     }
 
     /**
@@ -432,7 +432,7 @@ final class CommerceSignalsRecorder
                 'total_quantity' => $this->callIntMethod($cart, 'getTotalQuantity'),
                 'unique_item_count' => $this->callIntMethod($cart, 'countItems'),
             ], $properties), static fn (mixed $value): bool => $value !== null),
-        ]);
+        ], trusted: true);
     }
 
     private function recordVoucherEvent(object $cart, object $voucher, string $eventName): ?SignalEvent
@@ -466,7 +466,7 @@ final class CommerceSignalsRecorder
                 'voucher_type' => $this->resolveVoucherType($voucher),
                 'voucher_value' => $this->readPublicInt($voucher, 'value'),
             ], static fn (mixed $value): bool => $value !== null),
-        ]);
+        ], trusted: true);
     }
 
     private function resolveTrackedPropertyForCart(object $cart): ?TrackedProperty
@@ -522,7 +522,7 @@ final class CommerceSignalsRecorder
                 'item_count' => $this->readPublicInt($event, 'itemCount'),
                 'currency' => $this->readPublicScalar($event, 'currency'),
             ], static fn (mixed $value): bool => $value !== null),
-        ]);
+        ], trusted: true);
     }
 
     private function resolveTrackedPropertyForAffiliateModel(Model $model): ?TrackedProperty
@@ -682,7 +682,7 @@ final class CommerceSignalsRecorder
             'external_id' => $data['external_id'] ?? null,
             'anonymous_id' => $data['anonymous_id'] ?? null,
             'properties' => $data['properties'] ?? array_filter($data, static fn (string $key): bool => ! in_array($key, ['event_category', 'occurred_at', 'revenue_minor', 'currency', 'external_id', 'anonymous_id', 'owner_type', 'owner_id', 'properties'], true), ARRAY_FILTER_USE_KEY),
-        ]);
+        ], trusted: true);
     }
 
     private function recordAffiliateNetworkEvent(object $subject, string $eventName, string $category): ?SignalEvent
@@ -711,7 +711,7 @@ final class CommerceSignalsRecorder
                 'subject_id' => $this->readPublicScalar($subject, 'id'),
                 'status' => $this->readPublicScalar($subject, 'status'),
             ], static fn (mixed $value): bool => $value !== null),
-        ]);
+        ], trusted: true);
     }
 
     private function attributeValue(Model $model, string $attribute): mixed

@@ -86,7 +86,7 @@ final class ServeSignalsTracker
 
   if (!eventEndpoint) {
     var eventUrl = new URL(script.src, window.location.href);
-    eventUrl.pathname = eventUrl.pathname.replace(/__TRACKER_SCRIPT_PATTERN__$/, '/collect/event');
+    eventUrl.pathname = eventUrl.pathname.replace(/__TRACKER_SCRIPT_PATTERN__$/, '/collect/browser-event');
     eventUrl.search = '';
     eventUrl.hash = '';
     eventEndpoint = eventUrl.toString();

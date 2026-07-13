@@ -34,14 +34,17 @@ final class IngestSignalEvent
     /**
      * @param  array<string, mixed>  $payload
      */
-    public function handle(TrackedProperty $trackedProperty, array $payload): SignalEvent
+    public function handle(TrackedProperty $trackedProperty, array $payload, bool $trusted): SignalEvent
     {
         $identity = $this->resolveIdentity($trackedProperty, $payload);
         $session = $this->resolveSession->handle($trackedProperty, $identity, $payload);
         $occurredAt = $this->resolveOccurredAt($payload);
-        $properties = $this->filterProperties(is_array($payload['properties'] ?? null) ? $payload['properties'] : null);
-        $sourceEventId = $this->stringValue($payload['source_event_id'] ?? null);
-        $idempotencyKey = $this->stringValue($payload['idempotency_key'] ?? null) ?? $sourceEventId;
+        $rawProperties = is_array($payload['properties'] ?? null) ? $payload['properties'] : null;
+        $properties = $trusted ? $rawProperties : $this->filterProperties($rawProperties);
+        $sourceEventId = $trusted ? $this->stringValue($payload['source_event_id'] ?? null) : null;
+        $idempotencyKey = $trusted
+            ? $this->stringValue($payload['idempotency_key'] ?? null) ?? $sourceEventId
+            : null;
 
         if ($idempotencyKey !== null) {
             $existing = CrossTenantQuery::findExistingEvent($trackedProperty, $idempotencyKey);
@@ -68,8 +71,10 @@ final class IngestSignalEvent
             'campaign' => $payload['campaign'] ?? ($payload['utm_campaign'] ?? $session?->utm_campaign),
             'content' => $payload['content'] ?? ($payload['utm_content'] ?? $session?->utm_content),
             'term' => $payload['term'] ?? ($payload['utm_term'] ?? $session?->utm_term),
-            'revenue_minor' => (int) ($payload['revenue_minor'] ?? 0),
-            'currency' => (string) ($payload['currency'] ?? $trackedProperty->currency),
+            'revenue_minor' => $trusted ? (int) ($payload['revenue_minor'] ?? 0) : 0,
+            'currency' => $trusted
+                ? (string) ($payload['currency'] ?? $trackedProperty->currency)
+                : (string) $trackedProperty->currency,
             'properties' => $properties,
             'property_types' => $this->propertyTypeInferrer->infer($properties),
         ]);
@@ -125,20 +130,21 @@ final class IngestSignalEvent
             'campaign' => ['nullable', 'string', 'max:255'],
             'content' => ['nullable', 'string', 'max:255'],
             'term' => ['nullable', 'string', 'max:255'],
-            'revenue_minor' => ['nullable', 'integer', 'min:0'],
-            'currency' => ['nullable', 'string', 'size:3'],
             'browser_version' => ['nullable', 'string', 'max:50'],
             'os_version' => ['nullable', 'string', 'max:50'],
             'device_brand' => ['nullable', 'string', 'max:100'],
             'device_model' => ['nullable', 'string', 'max:100'],
             'is_bot' => ['nullable', 'boolean'],
             'properties' => ['nullable', 'array'],
-            'idempotency_key' => ['nullable', 'string', 'max:255'],
-            'source_event_id' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $this->requestValidator->assertBrowserPayload(
+            request: $request,
+            writeKey: (string) $payload['write_key'],
+            eventName: (string) $payload['event_name'],
+        );
         $trackedProperty = $this->requestValidator->resolveTrackedProperty($request, (string) $payload['write_key']);
-        $event = $this->handle($trackedProperty, $payload);
+        $event = $this->handle($trackedProperty, $payload, trusted: false);
 
         return response()->json([
             'status' => 'ok',

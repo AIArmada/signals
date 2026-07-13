@@ -11,6 +11,7 @@ use AIArmada\Signals\Models\Concerns\AutoAssignsSignalOwnerOnCreate;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use RuntimeException;
 
@@ -84,6 +85,12 @@ final class SignalAlertLog extends Model
     public function trackedProperty(): BelongsTo
     {
         return $this->belongsTo(TrackedProperty::class, 'tracked_property_id');
+    }
+
+    /** @return HasMany<SignalAlertDelivery, $this> */
+    public function deliveries(): HasMany
+    {
+        return $this->hasMany(SignalAlertDelivery::class, 'signal_alert_log_id');
     }
 
     public function markAsRead(): void

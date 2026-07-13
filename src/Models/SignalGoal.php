@@ -9,6 +9,7 @@ use AIArmada\CommerceSupport\Concerns\LogsCommerceActivity;
 use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
+use AIArmada\CommerceSupport\Traits\HasOwnerScopeKey;
 use AIArmada\Signals\Models\Concerns\AutoAssignsSignalOwnerOnCreate;
 use AIArmada\Signals\Services\SignalEventConditionDefinition;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -39,6 +40,7 @@ final class SignalGoal extends Model implements Auditable
     use HasCommerceAudit;
     use HasOwner;
     use HasOwnerScopeConfig;
+    use HasOwnerScopeKey;
     use HasUuids;
     use LogsCommerceActivity;
 
@@ -112,13 +114,15 @@ final class SignalGoal extends Model implements Auditable
 
             $owner = OwnerContext::resolve();
 
-            if ($owner === null) {
-                throw new RuntimeException('Owner scoping is enabled but no owner was resolved while saving a signal goal.');
+            if ($owner === null && ! OwnerContext::isExplicitGlobal()) {
+                throw new RuntimeException('Owner scoping is enabled but no owner or explicit global context was resolved while saving a signal goal.');
             }
 
             if ($goal->tracked_property_id !== '' && $goal->tracked_property_id !== null) {
-                $propertyExists = TrackedProperty::query()
-                    ->forOwner($owner, includeGlobal: false)
+                $propertyQuery = TrackedProperty::query();
+                $propertyExists = ($owner === null
+                    ? $propertyQuery->globalOnly()
+                    : $propertyQuery->forOwner($owner, includeGlobal: false))
                     ->whereKey($goal->tracked_property_id)
                     ->exists();
 

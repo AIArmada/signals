@@ -15,6 +15,7 @@ return new class extends Migration
 
             $table->uuid('id')->primary();
             $table->nullableUuidMorphs('owner');
+            $table->string('owner_scope', 64)->default('global');
             $table->foreignUuid('tracked_property_id')->nullable();
             $table->foreignUuid('signal_segment_id')->nullable();
             $table->string('name');
@@ -27,7 +28,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestampsTz();
 
-            $table->unique(['owner_type', 'owner_id', 'slug']);
+            $table->unique(['owner_scope', 'slug']);
             $table->index(['report_type', 'is_active']);
             $table->index('tracked_property_id');
             $table->index('signal_segment_id');

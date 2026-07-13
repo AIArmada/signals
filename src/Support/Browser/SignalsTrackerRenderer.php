@@ -58,7 +58,7 @@ final class SignalsTrackerRenderer
             'data-signals-tracker' => '1',
             'data-write-key' => $trackedProperty->write_key,
             'data-endpoint' => $this->signalUrl('collect/pageview'),
-            'data-event-endpoint' => $this->signalUrl('collect/event'),
+            'data-event-endpoint' => $this->signalUrl('collect/browser-event'),
             'data-identify-endpoint' => $this->signalUrl('collect/identify'),
             'data-geo-endpoint' => $this->signalUrl('collect/geo'),
             'data-anonymous-id' => $context->visitorId,

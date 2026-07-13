@@ -15,6 +15,7 @@ return new class extends Migration
 
             $table->uuid('id')->primary();
             $table->nullableUuidMorphs('owner');
+            $table->string('owner_scope', 64)->default('global');
             $table->string('name');
             $table->string('slug');
             $table->text('description')->nullable();
@@ -23,7 +24,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestampsTz();
 
-            $table->unique(['owner_type', 'owner_id', 'slug']);
+            $table->unique(['owner_scope', 'slug']);
             $table->index(['match_type', 'is_active']);
         });
     }

@@ -9,6 +9,7 @@ use AIArmada\CommerceSupport\Concerns\LogsCommerceActivity;
 use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
+use AIArmada\CommerceSupport\Traits\HasOwnerScopeKey;
 use AIArmada\Signals\Models\Concerns\AutoAssignsSignalOwnerOnCreate;
 use AIArmada\Signals\Services\SavedSignalReportDefinition;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -41,6 +42,7 @@ final class SavedSignalReport extends Model implements Auditable
     use HasCommerceAudit;
     use HasOwner;
     use HasOwnerScopeConfig;
+    use HasOwnerScopeKey;
     use HasUuids;
     use LogsCommerceActivity;
 
@@ -133,13 +135,15 @@ final class SavedSignalReport extends Model implements Auditable
 
             $owner = OwnerContext::resolve();
 
-            if ($owner === null) {
-                throw new RuntimeException('Owner scoping is enabled but no owner was resolved while saving a saved signal report.');
+            if ($owner === null && ! OwnerContext::isExplicitGlobal()) {
+                throw new RuntimeException('Owner scoping is enabled but no owner or explicit global context was resolved while saving a saved signal report.');
             }
 
             if ($report->tracked_property_id !== '' && $report->tracked_property_id !== null) {
-                $propertyExists = TrackedProperty::query()
-                    ->forOwner($owner, includeGlobal: false)
+                $propertyQuery = TrackedProperty::query();
+                $propertyExists = ($owner === null
+                    ? $propertyQuery->globalOnly()
+                    : $propertyQuery->forOwner($owner, includeGlobal: false))
                     ->whereKey($report->tracked_property_id)
                     ->exists();
 
@@ -149,8 +153,10 @@ final class SavedSignalReport extends Model implements Auditable
             }
 
             if ($report->signal_segment_id !== '' && $report->signal_segment_id !== null) {
-                $segmentExists = SignalSegment::query()
-                    ->forOwner($owner, includeGlobal: false)
+                $segmentQuery = SignalSegment::query();
+                $segmentExists = ($owner === null
+                    ? $segmentQuery->globalOnly()
+                    : $segmentQuery->forOwner($owner, includeGlobal: false))
                     ->whereKey($report->signal_segment_id)
                     ->exists();
 

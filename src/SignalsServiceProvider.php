@@ -10,6 +10,7 @@ use AIArmada\Signals\Contracts\BrowserContextResolverInterface;
 use AIArmada\Signals\Contracts\ReportInterface;
 use AIArmada\Signals\Contracts\SignalLocationResolverContract;
 use AIArmada\Signals\Models\SavedSignalReport;
+use AIArmada\Signals\Models\SignalAlertDelivery;
 use AIArmada\Signals\Models\SignalAlertLog;
 use AIArmada\Signals\Models\SignalAlertRule;
 use AIArmada\Signals\Models\SignalDailyMetric;
@@ -303,6 +304,7 @@ final class SignalsServiceProvider extends PackageServiceProvider
             'signal_interaction_rule' => SignalInteractionRule::class,
             'signal_alert_rule' => SignalAlertRule::class,
             'signal_alert_log' => SignalAlertLog::class,
+            'signal_alert_delivery' => SignalAlertDelivery::class,
             'signal_segment' => SignalSegment::class,
             'saved_signal_report' => SavedSignalReport::class,
         ]);

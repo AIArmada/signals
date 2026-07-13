@@ -71,16 +71,37 @@ Optional device fields can be passed explicitly. When `ua_parsing` is enabled th
 }
 ```
 
-### Custom Event
+### Browser Event
 
-`POST /api/signals/collect/event`
+`POST /api/signals/collect/browser-event`
 
 ```json
 {
   "write_key": "prop_write_key",
-  "event_name": "checkout.completed",
-  "event_category": "checkout",
+  "event_name": "product.viewed",
+  "event_category": "interaction",
   "session_identifier": "sig_session_1",
+  "properties": {
+    "item_name": "Example product"
+  }
+}
+```
+
+The browser route is deliberately non-financial. It enforces a configurable event allowlist, bounded payload size/depth/key counts, and rate limiting by write key plus client address. Revenue, currency, order/conversion/transaction identifiers, source event IDs, and client-controlled idempotency keys are rejected. `Origin`, `Referer`, and the page URL are domain-policy signals only; they are not authentication.
+
+### Trusted Server Outcome
+
+`POST /api/signals/collect/server-outcome`
+
+Server outcomes require `X-Signals-Timestamp` and `X-Signals-Signature` headers. The signature is lowercase hexadecimal HMAC-SHA256 over `{timestamp}.{raw-json-body}` using `SIGNALS_TRUSTED_INGESTION_SECRET`. Prefixing the signature with `sha256=` is supported. Timestamps outside the configured replay window and repeated signatures are rejected.
+
+```json
+{
+  "write_key": "prop_write_key",
+  "event_name": "order.paid",
+  "event_category": "conversion",
+  "idempotency_key": "order-paid-1001",
+  "transaction_id": "txn-1001",
   "revenue_minor": 14900,
   "currency": "MYR",
   "properties": {
@@ -123,7 +144,7 @@ The browser tracker automatically captures `utm_*` values from the landing page 
 
 ### Manual event tracking
 
-If you emit events from the server side, you can also include attribution fields in the payload you send to Signals so the event stays associated with the originating campaign.
+Trusted server outcomes may include attribution fields in their signed payload so the event remains associated with the originating campaign. Browser events remain non-financial regardless of the configured property allowlist.
 
 ## Browser Tracker
 
@@ -229,7 +250,7 @@ $event = IngestSignalEvent::run($trackedProperty, [
     'external_id' => 'user-123',
     'revenue_minor' => 14900,
     'currency' => 'MYR',
-]);
+], trusted: true);
 
 // Resolve or create a session for a tracked property
 $session = ResolveSession::run($trackedProperty, $identity, [
@@ -242,7 +263,7 @@ $result = EvaluateAlertRules::run(); // ['processed' => 5, 'skipped' => 1, 'disp
 $result = EvaluateAlertRules::run(trackedPropertyId: $property->id, dryRun: true);
 ```
 
-- **`IngestSignalEvent`** — handles identity resolution, session stitching, property allowlisting, idempotency via `source_event_id`, and optional on-ingest alert evaluation.
+- **`IngestSignalEvent`** — requires callers to explicitly choose `trusted: true` or `trusted: false`, then handles identity resolution, session stitching, property allowlisting, trusted idempotency via `source_event_id`, and optional on-ingest alert evaluation.
 - **`ResolveSession`** — resolves or creates sessions with device/UA parsing, IP capture (Cloudflare-aware), country detection, and attribution enrichment (UTM/referrer).
 - **`EvaluateAlertRules`** — iterates active `SignalAlertRule` records through the `SignalAlertEvaluator` and dispatches matched alerts via the `SignalAlertDispatcher`.
 

@@ -66,38 +66,36 @@ final class ProcessSignalAlertsCommand extends Command
             $query->whereKey($ruleId);
         }
 
-        $rules = $query->orderByDesc('priority')->get();
-
-        if ($rules->isEmpty()) {
+        if (! (clone $query)->exists()) {
             $this->line('No active signal alert rules found.');
 
             return ['processed' => 0, 'skipped' => 0, 'dispatched' => 0];
         }
 
-        $processed = 0;
-        $skipped = 0;
-        $dispatched = 0;
+        $summary = ['processed' => 0, 'skipped' => 0, 'dispatched' => 0];
 
-        foreach ($rules as $rule) {
-            if ($rule->isInCooldown()) {
-                $skipped++;
+        $query->orderBy('id')->chunkById(100, function ($rules) use ($dryRun, &$summary): void {
+            foreach ($rules as $rule) {
+                if ($rule->isInCooldown()) {
+                    ++$summary['skipped'];
 
-                continue;
+                    continue;
+                }
+
+                $result = $this->evaluator->evaluate($rule);
+                ++$summary['processed'];
+
+                if (! $result['matched']) {
+                    continue;
+                }
+
+                if (! $dryRun) {
+                    $this->dispatcher->dispatch($rule, $result['metric_value'], $result['context']);
+                    ++$summary['dispatched'];
+                }
             }
+        }, 'id');
 
-            $result = $this->evaluator->evaluate($rule);
-            $processed++;
-
-            if (! $result['matched']) {
-                continue;
-            }
-
-            if (! $dryRun) {
-                $this->dispatcher->dispatch($rule, $result['metric_value'], $result['context']);
-                $dispatched++;
-            }
-        }
-
-        return ['processed' => $processed, 'skipped' => $skipped, 'dispatched' => $dispatched];
+        return $summary;
     }
 }

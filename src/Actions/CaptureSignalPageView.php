@@ -60,9 +60,8 @@ final class CaptureSignalPageView
             'campaign' => $payload['campaign'] ?? null,
             'content' => $payload['content'] ?? null,
             'term' => $payload['term'] ?? null,
-            'currency' => $payload['currency'] ?? null,
             'properties' => $properties === [] ? null : $properties,
-        ]);
+        ], trusted: false);
     }
 
     public function asController(Request $request): JsonResponse
@@ -99,10 +98,14 @@ final class CaptureSignalPageView
             'campaign' => ['nullable', 'string', 'max:255'],
             'content' => ['nullable', 'string', 'max:255'],
             'term' => ['nullable', 'string', 'max:255'],
-            'currency' => ['nullable', 'string', 'size:3'],
             'properties' => ['nullable', 'array'],
         ]);
 
+        $this->requestValidator->assertBrowserPayload(
+            request: $request,
+            writeKey: (string) $payload['write_key'],
+            eventName: (string) config('signals.defaults.page_view_event_name', 'page_view'),
+        );
         $trackedProperty = $this->requestValidator->resolveTrackedProperty($request, (string) $payload['write_key']);
         $event = $this->handle($trackedProperty, $payload);
 
