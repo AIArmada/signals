@@ -81,7 +81,7 @@ final class SignalsIngestionRequestValidator
     {
         $maxBytes = max(1024, (int) config("signals.ingestion.{$boundary}.max_bytes", 32768));
 
-        if (strlen($request->getContent()) > $maxBytes) {
+        if (mb_strlen($request->getContent()) > $maxBytes) {
             throw ValidationException::withMessages([
                 'payload' => "The {$boundary} Signals payload exceeds {$maxBytes} bytes.",
             ]);
@@ -96,7 +96,7 @@ final class SignalsIngestionRequestValidator
     }
 
     /**
-     * @param array<array-key, mixed> $values
+     * @param  array<array-key, mixed>  $values
      */
     private function walkPayload(
         array $values,
@@ -113,7 +113,7 @@ final class SignalsIngestionRequestValidator
         }
 
         foreach ($values as $key => $value) {
-            ++$keyCount;
+            $keyCount++;
 
             if ($keyCount > $maxKeys) {
                 throw ValidationException::withMessages([
@@ -121,13 +121,13 @@ final class SignalsIngestionRequestValidator
                 ]);
             }
 
-            if (is_string($key) && strlen($key) > $maxStringBytes) {
+            if (is_string($key) && mb_strlen($key) > $maxStringBytes) {
                 throw ValidationException::withMessages([
                     'payload' => "A Signals payload key exceeds {$maxStringBytes} bytes.",
                 ]);
             }
 
-            if (is_string($value) && strlen($value) > $maxStringBytes) {
+            if (is_string($value) && mb_strlen($value) > $maxStringBytes) {
                 throw ValidationException::withMessages([
                     'payload' => "A Signals payload value exceeds {$maxStringBytes} bytes.",
                 ]);
@@ -156,7 +156,7 @@ final class SignalsIngestionRequestValidator
     }
 
     /**
-     * @param array<array-key, mixed> $payload
+     * @param  array<array-key, mixed>  $payload
      */
     private function assertBrowserPayloadContainsNoTrustedFields(array $payload): void
     {
@@ -172,13 +172,13 @@ final class SignalsIngestionRequestValidator
     }
 
     /**
-     * @param array<array-key, mixed> $values
+     * @param  array<array-key, mixed>  $values
      */
     private function findForbiddenField(array $values): ?string
     {
         foreach ($values as $key => $value) {
             if (is_string($key)) {
-                $normalized = strtolower(preg_replace('/[^a-z0-9]+/i', '_', $key) ?? $key);
+                $normalized = mb_strtolower(preg_replace('/[^a-z0-9]+/i', '_', $key) ?? $key);
 
                 if (in_array($normalized, self::BROWSER_FORBIDDEN_FIELDS, true)) {
                     return $key;
@@ -267,7 +267,7 @@ final class SignalsIngestionRequestValidator
             $host = $parsedHost;
         }
 
-        return strtolower(trim($host, ". \t\n\r\0\x0B"));
+        return mb_strtolower(mb_trim($host, ". \t\n\r\0\x0B"));
     }
 
     private function hostMatchesDomain(string $observedHost, string $configuredDomain): bool

@@ -6,10 +6,20 @@ namespace AIArmada\Signals\Models;
 
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $signal_alert_log_id
+ * @property string $channel
+ * @property array<string, mixed>|null $destination
+ * @property string $status
+ * @property int $attempt_count
+ * @property int $max_attempts
+ * @property CarbonImmutable|null $leased_at
+ */
 final class SignalAlertDelivery extends Model
 {
     use HasOwner;

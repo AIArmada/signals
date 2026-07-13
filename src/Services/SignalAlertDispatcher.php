@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 final class SignalAlertDispatcher
 {
     /**
-     * @param array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      */
     public function dispatch(SignalAlertRule $rule, float $metricValue, array $context = []): SignalAlertLog
     {
@@ -153,7 +153,7 @@ final class SignalAlertDispatcher
                 $canonical = $destination;
                 ksort($canonical);
                 $destinations[] = [
-                    'key' => 'inline-' . substr(hash('sha256', json_encode($canonical, JSON_THROW_ON_ERROR)), 0, 32),
+                    'key' => 'inline-' . mb_substr(hash('sha256', json_encode($canonical, JSON_THROW_ON_ERROR)), 0, 32),
                     'destination' => $destination,
                 ];
             }

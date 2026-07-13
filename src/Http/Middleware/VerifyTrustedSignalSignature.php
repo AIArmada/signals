@@ -18,7 +18,7 @@ final class VerifyTrustedSignalSignature
     {
         $secret = config('signals.ingestion.trusted.secret');
 
-        if (! is_string($secret) || trim($secret) === '') {
+        if (! is_string($secret) || mb_trim($secret) === '') {
             throw new HttpException(503, 'Trusted Signals ingestion is not configured.');
         }
 
@@ -29,7 +29,7 @@ final class VerifyTrustedSignalSignature
             throw new HttpException(401, 'A valid Signals timestamp is required.');
         }
 
-        if (! is_string($signatureHeader) || trim($signatureHeader) === '') {
+        if (! is_string($signatureHeader) || mb_trim($signatureHeader) === '') {
             throw new HttpException(401, 'A valid Signals signature is required.');
         }
 
@@ -40,10 +40,10 @@ final class VerifyTrustedSignalSignature
             throw new HttpException(401, 'The Signals signature timestamp is outside the replay window.');
         }
 
-        $providedSignature = strtolower(trim($signatureHeader));
+        $providedSignature = mb_strtolower(mb_trim($signatureHeader));
 
         if (str_starts_with($providedSignature, 'sha256=')) {
-            $providedSignature = substr($providedSignature, 7);
+            $providedSignature = mb_substr($providedSignature, 7);
         }
 
         if (preg_match('/^[a-f0-9]{64}$/', $providedSignature) !== 1) {

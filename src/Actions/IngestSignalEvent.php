@@ -138,12 +138,12 @@ final class IngestSignalEvent
             'properties' => ['nullable', 'array'],
         ]);
 
+        $trackedProperty = $this->requestValidator->resolveTrackedProperty($request, (string) $payload['write_key']);
         $this->requestValidator->assertBrowserPayload(
             request: $request,
             writeKey: (string) $payload['write_key'],
             eventName: (string) $payload['event_name'],
         );
-        $trackedProperty = $this->requestValidator->resolveTrackedProperty($request, (string) $payload['write_key']);
         $event = $this->handle($trackedProperty, $payload, trusted: false);
 
         return response()->json([

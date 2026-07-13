@@ -46,7 +46,7 @@ final readonly class TrustedSignalOutcomeData
             idempotencyKey: (string) $payload['idempotency_key'],
             transactionId: (string) $payload['transaction_id'],
             revenueMinor: (int) $payload['revenue_minor'],
-            currency: strtoupper((string) $payload['currency']),
+            currency: mb_strtoupper((string) $payload['currency']),
             externalId: self::nullableString($payload['external_id'] ?? null),
             anonymousId: self::nullableString($payload['anonymous_id'] ?? null),
             occurredAt: self::nullableString($payload['occurred_at'] ?? null),

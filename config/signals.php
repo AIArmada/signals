@@ -283,6 +283,33 @@ return [
         ],
     ],
 
+    /* Public ingestion limits and event policy */
+    'ingestion' => [
+        'browser' => [
+            'event_allowlist' => [
+                'page_view',
+                'checkout_progressed',
+                'product.viewed',
+                'cart.*',
+                'custom.*',
+            ],
+            'max_bytes' => 32768,
+            'max_depth' => 4,
+            'max_keys' => 64,
+            'max_string_bytes' => 1024,
+            'rate_limit_per_minute' => 120,
+        ],
+        'trusted' => [
+            'max_bytes' => 32768,
+            'max_depth' => 4,
+            'max_keys' => 64,
+            'max_string_bytes' => 1024,
+            'rate_limit_per_minute' => 60,
+            'replay_window_seconds' => 300,
+            'secret' => env('SIGNALS_INGESTION_SECRET'),
+        ],
+    ],
+
     /* HTTP */
     'http' => [
         'prefix' => 'api/signals',

@@ -77,13 +77,13 @@ final class ProcessSignalAlertsCommand extends Command
         $query->orderBy('id')->chunkById(100, function ($rules) use ($dryRun, &$summary): void {
             foreach ($rules as $rule) {
                 if ($rule->isInCooldown()) {
-                    ++$summary['skipped'];
+                    $summary['skipped']++;
 
                     continue;
                 }
 
                 $result = $this->evaluator->evaluate($rule);
-                ++$summary['processed'];
+                $summary['processed']++;
 
                 if (! $result['matched']) {
                     continue;
@@ -91,7 +91,7 @@ final class ProcessSignalAlertsCommand extends Command
 
                 if (! $dryRun) {
                     $this->dispatcher->dispatch($rule, $result['metric_value'], $result['context']);
-                    ++$summary['dispatched'];
+                    $summary['dispatched']++;
                 }
             }
         }, 'id');

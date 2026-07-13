@@ -87,6 +87,38 @@ These toggles let you suppress specific built-in commerce recordings without dis
 
 Owner mode is opt-in for Signals. With the default config, browser/global analytics can run without a resolved owner. Once you enable owner mode, tracked-property resolution, writes, and admin queries follow the configured owner boundary and require either a resolved owner or explicit global context.
 
+## Ingestion
+
+```php
+'ingestion' => [
+    'browser' => [
+        'event_allowlist' => [
+            'page_view',
+            'checkout_progressed',
+            'product.viewed',
+            'cart.*',
+            'custom.*',
+        ],
+        'max_bytes' => 32768,
+        'max_depth' => 4,
+        'max_keys' => 64,
+        'max_string_bytes' => 1024,
+        'rate_limit_per_minute' => 120,
+    ],
+    'trusted' => [
+        'max_bytes' => 32768,
+        'max_depth' => 4,
+        'max_keys' => 64,
+        'max_string_bytes' => 1024,
+        'rate_limit_per_minute' => 60,
+        'replay_window_seconds' => 300,
+        'secret' => env('SIGNALS_INGESTION_SECRET'),
+    ],
+],
+```
+
+The public browser route accepts only allowlisted non-financial events. Revenue and transaction identifiers belong on the signed trusted-outcome route. Payload limits and rate limits apply before browser event persistence.
+
 ## Features
 
 ### User-Agent Parsing

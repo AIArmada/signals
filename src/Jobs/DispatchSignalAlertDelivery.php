@@ -225,10 +225,10 @@ final class DispatchSignalAlertDelivery implements OwnerScopedJob, ShouldQueue
 
     private function safeErrorCode(Throwable $exception): string
     {
-        $message = strtolower($exception->getMessage());
+        $message = mb_strtolower($exception->getMessage());
 
         return match (true) {
-            str_contains($message, 'http_') => substr($message, 0, 64),
+            str_contains($message, 'http_') => mb_substr($message, 0, 64),
             str_contains($message, 'invalid_destination') => 'invalid_destination',
             str_contains($message, 'unsupported_channel') => 'unsupported_channel',
             str_contains($message, 'timed out'), str_contains($message, 'timeout') => 'timeout',
