@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals;
 
+use AIArmada\Signals\Actions\IngestSignalEvent;
 use AIArmada\Signals\Console\Commands\AggregateDailyMetricsCommand;
 use AIArmada\Signals\Console\Commands\ProcessSignalAlertsCommand;
 use AIArmada\Signals\Contracts\BrowserContextResolverInterface;
 use AIArmada\Signals\Contracts\ReportInterface;
+use AIArmada\Signals\Contracts\SignalEventIngestor;
 use AIArmada\Signals\Contracts\SignalLocationResolverContract;
 use AIArmada\Signals\Models\SavedSignalReport;
 use AIArmada\Signals\Models\SignalAlertDelivery;
@@ -69,6 +71,7 @@ final class SignalsServiceProvider extends PackageServiceProvider
 
     public function packageRegistered(): void
     {
+        $this->app->bind(SignalEventIngestor::class, IngestSignalEvent::class);
         $this->app->singleton(SignalsDashboardService::class);
         $this->app->singleton(SignalMetricsAggregator::class);
         $this->app->singleton(TrackedPropertyResolver::class);

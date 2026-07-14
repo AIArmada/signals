@@ -348,21 +348,14 @@ final class CommerceSignalsRecorder
             ?? $this->readPublicScalar($conversion, 'subjectIdentifier');
         $subjectInstance = $this->stringValue($conversionModel->getAttribute('subject_instance'))
             ?? $this->readPublicScalar($conversion, 'subjectInstance');
-        $cartIdentifier = $this->stringValue($conversionModel->getAttribute('cart_identifier'))
-            ?? $this->readPublicScalar($conversion, 'cartIdentifier')
-            ?? $subjectIdentifier;
-        $cartInstance = $this->stringValue($conversionModel->getAttribute('cart_instance'))
-            ?? $this->readPublicScalar($conversion, 'cartInstance')
-            ?? $subjectInstance
-            ?? 'default';
         $revenueMinor = $this->resolveAffiliateRevenueMinor($conversionModel);
 
         return $this->ingestSignalEvent->handle($trackedProperty, [
             'event_name' => (string) config('signals.integrations.affiliates.conversion_event_name', 'affiliate.conversion.recorded'),
             'event_category' => (string) config('signals.integrations.affiliates.conversion_event_category', 'conversion'),
             'external_id' => $attributionModel instanceof Model ? $this->stringValue($attributionModel->getAttribute('user_id')) : null,
-            'anonymous_id' => $cartIdentifier,
-            'session_identifier' => $this->buildAffiliateSessionIdentifier($cartIdentifier, $cartInstance),
+            'anonymous_id' => $subjectIdentifier,
+            'session_identifier' => $this->buildAffiliateSessionIdentifier($subjectIdentifier, $subjectInstance ?? 'default'),
             'occurred_at' => $this->timestampValue($conversionModel->getAttribute('occurred_at') ?? $conversionModel->getAttribute('created_at')),
             'path' => $attributionModel instanceof Model ? $this->stringValue($attributionModel->getAttribute('landing_url')) : null,
             'url' => $attributionModel instanceof Model ? $this->stringValue($attributionModel->getAttribute('landing_url')) : null,
@@ -383,8 +376,6 @@ final class CommerceSignalsRecorder
                 'attribution_id' => $this->stringValue($conversionModel->getAttribute('affiliate_attribution_id')),
                 'subject_identifier' => $subjectIdentifier,
                 'subject_instance' => $subjectInstance,
-                'cart_identifier' => $this->stringValue($conversionModel->getAttribute('cart_identifier')),
-                'cart_instance' => $this->stringValue($conversionModel->getAttribute('cart_instance')),
                 'voucher_code' => $this->stringValue($conversionModel->getAttribute('voucher_code')),
                 'external_reference' => $this->stringValue($conversionModel->getAttribute('external_reference'))
                     ?? $this->readPublicScalar($conversion, 'externalReference'),

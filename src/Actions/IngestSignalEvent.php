@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AIArmada\Signals\Actions;
 
 use AIArmada\CommerceSupport\Support\OwnerContext;
+use AIArmada\Signals\Contracts\SignalEventIngestor;
 use AIArmada\Signals\Jobs\EvaluateSignalAlertsForEvent;
 use AIArmada\Signals\Models\SignalAlertRule;
 use AIArmada\Signals\Models\SignalEvent;
@@ -21,7 +22,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Lorisleiva\Actions\Concerns\AsAction;
 
-final class IngestSignalEvent
+final class IngestSignalEvent implements SignalEventIngestor
 {
     use AsAction;
 
