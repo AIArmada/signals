@@ -140,7 +140,7 @@ return [
                 'source_event_id',
                 'status',
                 'subtotal_minor',
-                'subject_identifier',
+                'subject_key',
                 'subject_instance',
                 'title',
                 'total_minor',

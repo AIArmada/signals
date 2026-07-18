@@ -202,7 +202,7 @@ Geolocation capture is available but reverse geocoding is opt-in. When `async` i
             'payment_gateway', 'quantity', 'referrer_url',
             'refund_reason',
             'shipping_method', 'source_event_id', 'status',
-            'subtotal_minor', 'subject_identifier', 'subject_instance',
+            'subtotal_minor', 'subject_key', 'subject_instance',
             'title', 'total_minor', 'total_quantity', 'transaction_id',
             'unique_item_count', 'unit_price_minor', 'value_minor',
             'variant_code', 'variant_id',

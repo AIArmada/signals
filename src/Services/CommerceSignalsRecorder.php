@@ -264,13 +264,13 @@ final class CommerceSignalsRecorder
             return null;
         }
 
-        $subjectIdentifier = $this->stringValue($attributionModel->getAttribute('subject_identifier'))
-            ?? $this->readPublicScalar($attribution, 'subjectIdentifier');
+        $subjectKey = $this->stringValue($attributionModel->getAttribute('subject_key'))
+            ?? $this->readPublicScalar($attribution, 'subjectKey');
         $subjectInstance = $this->stringValue($attributionModel->getAttribute('subject_instance'))
             ?? $this->readPublicScalar($attribution, 'subjectInstance');
         $cartIdentifier = $this->stringValue($attributionModel->getAttribute('cart_identifier'))
             ?? $this->readPublicScalar($attribution, 'cartIdentifier')
-            ?? $subjectIdentifier
+            ?? $subjectKey
             ?? $this->stringValue($attributionModel->getAttribute('cookie_value'))
             ?? $this->readPublicScalar($attribution, 'cookieValue');
         $cartInstance = $this->stringValue($attributionModel->getAttribute('cart_instance'))
@@ -303,7 +303,7 @@ final class CommerceSignalsRecorder
                     ?? $this->readPublicScalar($attribution, 'affiliateId'),
                 'affiliate_code' => $this->stringValue($attributionModel->getAttribute('affiliate_code'))
                     ?? $this->readPublicScalar($attribution, 'affiliateCode'),
-                'subject_identifier' => $subjectIdentifier,
+                'subject_key' => $subjectKey,
                 'subject_instance' => $subjectInstance,
                 'cart_identifier' => $this->stringValue($attributionModel->getAttribute('cart_identifier')),
                 'cart_instance' => $this->stringValue($attributionModel->getAttribute('cart_instance')),
@@ -344,8 +344,8 @@ final class CommerceSignalsRecorder
             $this->stringValue($conversionModel->getAttribute('owner_type')),
             $this->stringValue($conversionModel->getAttribute('owner_id')),
         );
-        $subjectIdentifier = $this->stringValue($conversionModel->getAttribute('subject_identifier'))
-            ?? $this->readPublicScalar($conversion, 'subjectIdentifier');
+        $subjectKey = $this->stringValue($conversionModel->getAttribute('subject_key'))
+            ?? $this->readPublicScalar($conversion, 'subjectKey');
         $subjectInstance = $this->stringValue($conversionModel->getAttribute('subject_instance'))
             ?? $this->readPublicScalar($conversion, 'subjectInstance');
         $revenueMinor = $this->resolveAffiliateRevenueMinor($conversionModel);
@@ -354,8 +354,8 @@ final class CommerceSignalsRecorder
             'event_name' => (string) config('signals.integrations.affiliates.conversion_event_name', 'affiliate.conversion.recorded'),
             'event_category' => (string) config('signals.integrations.affiliates.conversion_event_category', 'conversion'),
             'external_id' => $attributionModel instanceof Model ? $this->stringValue($attributionModel->getAttribute('user_id')) : null,
-            'anonymous_id' => $subjectIdentifier,
-            'session_identifier' => $this->buildAffiliateSessionIdentifier($subjectIdentifier, $subjectInstance ?? 'default'),
+            'anonymous_id' => $subjectKey,
+            'session_identifier' => $this->buildAffiliateSessionIdentifier($subjectKey, $subjectInstance ?? 'default'),
             'occurred_at' => $this->timestampValue($conversionModel->getAttribute('occurred_at') ?? $conversionModel->getAttribute('created_at')),
             'path' => $attributionModel instanceof Model ? $this->stringValue($attributionModel->getAttribute('landing_url')) : null,
             'url' => $attributionModel instanceof Model ? $this->stringValue($attributionModel->getAttribute('landing_url')) : null,
@@ -374,7 +374,7 @@ final class CommerceSignalsRecorder
                 'affiliate_code' => $this->stringValue($conversionModel->getAttribute('affiliate_code'))
                     ?? $this->readPublicScalar($conversion, 'affiliateCode'),
                 'attribution_id' => $this->stringValue($conversionModel->getAttribute('affiliate_attribution_id')),
-                'subject_identifier' => $subjectIdentifier,
+                'subject_key' => $subjectKey,
                 'subject_instance' => $subjectInstance,
                 'voucher_code' => $this->stringValue($conversionModel->getAttribute('voucher_code')),
                 'external_reference' => $this->stringValue($conversionModel->getAttribute('external_reference'))
