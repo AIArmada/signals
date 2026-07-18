@@ -12,7 +12,7 @@ interface SignalLocationResolverContract
      * Enrich a session with additional location data after reverse geocoding.
      *
      * Consuming applications bind their own resolver to this contract in order
-     * to populate custom fields (e.g. district_id, subdistrict_id, timezone zone)
+     * to populate custom fields (e.g. administrative areas or timezone data)
      * without modifying the signals package itself.
      *
      * The resolver MUST be side-effect free regarding the resolved fields it does
