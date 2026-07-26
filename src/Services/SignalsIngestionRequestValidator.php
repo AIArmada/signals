@@ -51,12 +51,23 @@ final class SignalsIngestionRequestValidator
     public function assertBrowserPayload(Request $request, string $writeKey, string $eventName): void
     {
         $this->assertPayloadWithinLimits($request, 'browser');
-        $this->assertBrowserEventAllowed($eventName);
-        $this->assertBrowserPayloadContainsNoTrustedFields($request->all());
+        $this->assertUntrustedEvent($eventName, $request->all());
         $this->assertRateLimit(
             key: 'signals:browser:' . hash('sha256', $writeKey) . ':' . ($request->ip() ?? 'unknown'),
             attempts: max(1, (int) config('signals.ingestion.browser.rate_limit_per_minute', 120)),
         );
+    }
+
+    /**
+     * Validate an untrusted event that is ingested through an application-owned
+     * endpoint instead of the package browser route.
+     *
+     * @param  array<array-key, mixed>  $payload
+     */
+    public function assertUntrustedEvent(string $eventName, array $payload = []): void
+    {
+        $this->assertBrowserEventAllowed($eventName);
+        $this->assertBrowserPayloadContainsNoTrustedFields($payload);
     }
 
     public function assertTrustedPayloadWithinLimits(Request $request): void
