@@ -74,6 +74,11 @@ final class SignalsTrackerRenderer
             'data-email' => $this->email($overrides),
             'data-page-properties' => $pageProperties === [] ? null : $this->jsonEncode($pageProperties),
             'data-interaction-rules' => $interactionRules === [] ? null : $this->jsonEncode($interactionRules),
+            'data-inline-tracking' => $this->boolOverride(
+                $overrides,
+                'enableInlineTracking',
+                (bool) config('signals.integrations.browser.interaction_tracking.inline_attributes.enabled', true),
+            ) ? 'true' : 'false',
         ];
 
         $this->browserContextManager->markTrackerRendered($request);

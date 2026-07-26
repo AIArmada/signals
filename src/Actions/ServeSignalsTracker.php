@@ -42,6 +42,7 @@ final class ServeSignalsTracker
   var externalId = script.dataset.externalId || null;
   var email = script.dataset.email || null;
   var enableGeolocation = script.dataset.enableGeolocation === 'true';
+  var inlineTrackingEnabled = script.dataset.inlineTracking !== 'false';
   var interactionRules = (function () {
     if (!script.dataset.interactionRules) {
       return [];
@@ -510,9 +511,177 @@ final class ServeSignalsTracker
     );
   }
 
+  function browserPlatform() {
+    var ua = navigator.userAgent.toLowerCase();
+
+    if (ua.indexOf('ipad') !== -1) { return 'ipados'; }
+    if (ua.indexOf('iphone') !== -1 || ua.indexOf('ipod') !== -1) { return 'ios'; }
+    if (ua.indexOf('android') !== -1) { return 'android'; }
+    if (ua.indexOf('macintosh') !== -1 || ua.indexOf('mac os') !== -1) { return 'macos'; }
+    if (ua.indexOf('windows') !== -1) { return 'windows'; }
+    if (ua.indexOf('linux') !== -1) { return 'linux'; }
+
+    return 'web';
+  }
+
+  function browserFamily(platform) {
+    return platform === 'ios' || platform === 'android' || platform === 'ipados' ? 'mobile'
+      : platform === 'macos' || platform === 'windows' || platform === 'linux' ? 'desktop'
+      : 'web';
+  }
+
+  function parseInlineProps(raw) {
+    if (!raw) { return {}; }
+
+    try {
+      var parsed = JSON.parse(raw);
+
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function inlineLabel(element) {
+    if (!element) { return null; }
+
+    if (element.dataset.signalLabel) {
+      return normalizeText(element.dataset.signalLabel);
+    }
+
+    if (element.getAttribute('aria-label')) {
+      return normalizeText(element.getAttribute('aria-label'));
+    }
+
+    if (element.getAttribute('title')) {
+      return normalizeText(element.getAttribute('title'));
+    }
+
+    return normalizeText(element.textContent);
+  }
+
+  function inlineEventPayload(name, category, element, extraProperties) {
+    var platform = browserPlatform();
+    var props = parseInlineProps(element.dataset.signalProps);
+    var signalComponent = element.dataset.signalComponent
+      || (element.closest && element.closest('[data-signal-component]') ? (element.closest('[data-signal-component]') || {}).dataset.signalComponent : null)
+      || null;
+    var signalControl = element.dataset.signalControl || element.name || element.id || null;
+    var signalEntityType = element.dataset.signalEntityType || null;
+    var signalEntityId = element.dataset.signalEntityId || null;
+
+    props.surface = (pageProperties && pageProperties.surface) || 'public';
+    props.page = window.location.pathname;
+    props.client_origin = 'web';
+    props.client_origin_source = 'browser_tracker';
+    props.client_platform = platform;
+    props.client_family = browserFamily(platform);
+    props.client_transport = 'web';
+    props.component = signalComponent;
+    props.control = signalControl;
+    props.label = inlineLabel(element);
+    props.entity_type = signalEntityType;
+    props.entity_id = signalEntityId;
+
+    if (element instanceof HTMLAnchorElement) {
+      props.href = element.href;
+    }
+
+    if (extraProperties && typeof extraProperties === 'object') {
+      Object.keys(extraProperties).forEach(function (k) {
+        props[k] = extraProperties[k];
+      });
+    }
+
+    var context = currentTrackingContext();
+
+    return {
+      write_key: context.write_key,
+      event_name: name,
+      event_category: category || name.split('.')[0] || 'ui',
+      external_id: context.external_id,
+      anonymous_id: context.anonymous_id,
+      email: context.email,
+      session_identifier: context.session_identifier,
+      session_started_at: context.session_started_at,
+      occurred_at: context.occurred_at,
+      path: context.path,
+      url: context.url,
+      referrer: context.referrer,
+      utm_source: context.utm_source,
+      utm_medium: context.utm_medium,
+      utm_campaign: context.utm_campaign,
+      utm_content: context.utm_content,
+      utm_term: context.utm_term,
+      properties: props
+    };
+  }
+
+  function installInlineAttributeTracking() {
+    if (!inlineTrackingEnabled || !eventEndpoint) { return; }
+
+    document.addEventListener('click', function (event) {
+      var trigger = event.target instanceof Element
+        ? event.target.closest('[data-signal-event]')
+        : null;
+
+      if (!trigger || trigger.matches('[disabled], [aria-disabled="true"]')) {
+        return;
+      }
+
+      emit(eventEndpoint, inlineEventPayload(
+        trigger.dataset.signalEvent,
+        trigger.dataset.signalCategory || null,
+        trigger
+      ));
+    }, true);
+
+    document.addEventListener('submit', function (event) {
+      var form = event.target instanceof HTMLFormElement ? event.target : null;
+
+      if (!form || !form.dataset.signalSubmitEvent) {
+        return;
+      }
+
+      emit(eventEndpoint, inlineEventPayload(
+        form.dataset.signalSubmitEvent,
+        form.dataset.signalCategory || null,
+        form
+      ));
+    }, true);
+
+    document.addEventListener('change', function (event) {
+      var target = event.target instanceof HTMLElement ? event.target : null;
+
+      if (!target) { return; }
+
+      var trigger = target.closest ? target.closest('[data-signal-change-event]') : null;
+
+      if (!trigger) { return; }
+
+      var includeValue = target.dataset.signalIncludeValue === 'true'
+        || (trigger.dataset.signalIncludeValue === 'true');
+
+      emit(eventEndpoint, inlineEventPayload(
+        trigger.dataset.signalChangeEvent,
+        trigger.dataset.signalCategory || null,
+        trigger,
+        {
+          field_name: target.getAttribute('name') || target.id || null,
+          field_type: target.getAttribute('type') || target.tagName.toLowerCase(),
+          field_value: includeValue ? (target.type === 'checkbox' || target.type === 'radio')
+            ? (target.checked ? target.value : null)
+            : target.value || null
+            : null
+        }
+      ));
+    }, true);
+  }
+
   sendIdentify();
   sendPageView();
   installInteractionTracking();
+  installInlineAttributeTracking();
   setTimeout(captureGeolocation, 500);
 })();
 JS;

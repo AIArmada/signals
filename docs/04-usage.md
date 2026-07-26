@@ -216,6 +216,70 @@ When `signals.integrations.browser.interaction_tracking.enabled` is `true`, the 
 - selector-less rules are omitted by default unless `include_rules_without_selector` is enabled
 - `media` trigger rules are still included without a selector so the tracker can observe media events
 
+### Inline attribute tracking
+
+When `signals.integrations.browser.interaction_tracking.inline_attributes.enabled` is `true` (default), the tracker automatically observes `data-signal-*` attributes on HTML elements without needing any `SignalInteractionRule` database records.
+
+Add a tracking attribute directly to any element in your Blade templates:
+
+```blade
+{{-- Click tracking --}}
+<button data-signal-event="checkout.started"
+        data-signal-category="checkout">
+    Start Checkout
+</button>
+
+{{-- Form submit tracking --}}
+<form data-signal-submit-event="search.submitted"
+      data-signal-category="search">
+    ...
+</form>
+
+{{-- Input change tracking --}}
+<select data-signal-change-event="filter.changed"
+        data-signal-category="discovery"
+        data-signal-include-value="true">
+    <option value="recent">Recent</option>
+</select>
+
+{{-- With custom properties --}}
+<a href="/events"
+   data-signal-event="navigation.feature_clicked"
+   data-signal-props='{"feature":"popular_events"}'>
+    Popular Events
+</a>
+```
+
+**Supported attributes:**
+
+| Attribute | Applies to | Description |
+|---|---|---|
+| `data-signal-event` | any element | Event name fired on click |
+| `data-signal-submit-event` | `<form>` | Event name fired on form submit |
+| `data-signal-change-event` | `<input>`, `<select>`, `<textarea>` | Event name fired on value change |
+| `data-signal-category` | any | Event category (defaults to first segment of event name) |
+| `data-signal-component` | any | Component identifier |
+| `data-signal-control` | any | Control name (falls back to `name` or `id`) |
+| `data-signal-label` | any | Element label (falls back to `aria-label`, `title`, or text content) |
+| `data-signal-entity-type` | any | Entity type (e.g., `event`, `institution`) |
+| `data-signal-entity-id` | any | Entity identifier |
+| `data-signal-props` | any | JSON object of additional properties to merge |
+| `data-signal-include-value` | change events | When `"true"`, includes the input value in the event payload |
+
+**Property metadata included automatically:**
+
+- `surface` — from `data-page-properties` (or `"public"`)
+- `page` — current pathname
+- `client_origin` — `"web"`
+- `client_origin_source` — `"browser_tracker"`
+- `client_platform` — detected OS (`ios`, `android`, `macos`, `windows`, `linux`, `web`)
+- `client_family` — `"mobile"`, `"desktop"`, or `"web"`
+- `client_transport` — `"web"`
+- `label` — resolved from `data-signal-label`, `aria-label`, `title`, or text content
+- `href` — on `<a>` elements
+
+Change events additionally include `field_name`, `field_type`, and optionally `field_value`.
+
 ## Server-Side Event Recording
 
 Use `CommerceSignalsRecorder` for direct recording from app/domain events.

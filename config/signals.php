@@ -183,6 +183,9 @@ return [
             'interaction_tracking' => [
                 'enabled' => true,
                 'include_rules_without_selector' => false,
+                'inline_attributes' => [
+                    'enabled' => true,
+                ],
             ],
             'identifiers' => [
                 'visitor_cookie_name' => 'sig_vid',
