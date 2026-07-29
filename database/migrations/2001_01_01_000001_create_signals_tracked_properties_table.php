@@ -29,6 +29,7 @@ return new class extends Migration
 
             $table->unique(['owner_scope', 'slug']);
             $table->index(['type', 'is_active']);
+            $table->index(['owner_scope', 'type', 'is_active', 'created_at']);
         });
     }
 };

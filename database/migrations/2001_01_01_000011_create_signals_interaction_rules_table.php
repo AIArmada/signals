@@ -34,6 +34,7 @@ return new class extends Migration
             $table->index(['tracked_property_id', 'is_active']);
             $table->index(['trigger_type', 'is_active']);
             $table->index(['event_name', 'event_category']);
+            $table->index(['owner_scope', 'tracked_property_id', 'is_active', 'sort_order', 'created_at']);
         });
     }
 };
