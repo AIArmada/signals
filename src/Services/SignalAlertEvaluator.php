@@ -33,6 +33,10 @@ final class SignalAlertEvaluator
 
     private function calculateMetricValue(SignalAlertRule $rule): float
     {
+        if (! $this->hasPropertyFilters($rule)) {
+            return $this->calculateDatabaseMetricValue($rule);
+        }
+
         $events = $this->filteredEvents($rule);
 
         return match ($rule->metric_key) {
@@ -43,6 +47,40 @@ final class SignalAlertEvaluator
             'conversion_rate' => $this->calculateConversionRate($events),
             default => $this->calculatePropertyMetric($rule->metric_key, $events),
         };
+    }
+
+    private function calculateDatabaseMetricValue(SignalAlertRule $rule): float
+    {
+        $query = $this->baseQuery($rule);
+
+        if ($rule->metric_key === 'conversion_rate') {
+            $totals = $query
+                ->selectRaw("SUM(CASE WHEN event_category = 'page_view' THEN 1 ELSE 0 END) as page_views")
+                ->selectRaw("SUM(CASE WHEN event_category = 'conversion' THEN 1 ELSE 0 END) as conversions")
+                ->toBase()
+                ->first();
+            $pageViews = (float) ($totals->page_views ?? 0);
+
+            return $pageViews === 0.0
+                ? 0.0
+                : round(((float) ($totals->conversions ?? 0) / $pageViews) * 100, 4);
+        }
+
+        return match ($rule->metric_key) {
+            'events', 'event_count' => (float) $query->count(),
+            'page_views' => (float) (clone $query)->where('event_category', 'page_view')->count(),
+            'conversions' => (float) (clone $query)->where('event_category', 'conversion')->count(),
+            'revenue_minor' => (float) $query->sum('revenue_minor'),
+            default => $this->calculatePropertyMetric($rule->metric_key, $this->filteredEvents($rule)),
+        };
+    }
+
+    private function hasPropertyFilters(SignalAlertRule $rule): bool
+    {
+        $filters = $this->eventFilters($rule);
+        $conditions = $filters['properties'] ?? ($filters['property_conditions'] ?? []);
+
+        return is_array($conditions) && $conditions !== [];
     }
 
     /**

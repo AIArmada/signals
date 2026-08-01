@@ -44,13 +44,21 @@ final class SignalsDashboardService
 
             $identities->whereBetween('last_seen_at', [$startAt, $endAt]);
 
+            $metricTotals = (clone $dailyMetrics)
+                ->selectRaw('COALESCE(SUM(sessions), 0) as sessions')
+                ->selectRaw('COALESCE(SUM(events), 0) as events')
+                ->selectRaw('COALESCE(SUM(conversions), 0) as conversions')
+                ->selectRaw('COALESCE(SUM(revenue_minor), 0) as revenue_minor')
+                ->toBase()
+                ->first();
+
             return [
                 'tracked_properties' => $trackedProperties->count(),
                 'identities' => $identities->count(),
-                'sessions' => (int) ((clone $dailyMetrics)->sum('sessions')),
-                'events' => (int) ((clone $dailyMetrics)->sum('events')),
-                'conversions' => (int) ((clone $dailyMetrics)->sum('conversions')),
-                'revenue_minor' => (int) ((clone $dailyMetrics)->sum('revenue_minor')),
+                'sessions' => (int) ($metricTotals->sessions ?? 0),
+                'events' => (int) ($metricTotals->events ?? 0),
+                'conversions' => (int) ($metricTotals->conversions ?? 0),
+                'revenue_minor' => (int) ($metricTotals->revenue_minor ?? 0),
                 'active_alert_rules' => $alertRules->count(),
                 'unread_alerts' => $alertLogs->count(),
             ];
