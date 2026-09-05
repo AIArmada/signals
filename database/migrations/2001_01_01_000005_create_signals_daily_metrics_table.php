@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create(config('signals.database.tables.daily_metrics', 'signal_daily_metrics'), function (Blueprint $table): void {
+        commerce_schema_create_if_missing(config('signals.database.tables.daily_metrics', 'signal_daily_metrics'), function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->foreignUuid('tracked_property_id');
             $table->nullableUuidMorphs('owner');

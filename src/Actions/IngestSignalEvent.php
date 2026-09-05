@@ -18,6 +18,7 @@ use AIArmada\Signals\Services\SignalEventPropertyTypeInferrer;
 use AIArmada\Signals\Services\SignalsIngestionRequestValidator;
 use AIArmada\Signals\Support\CrossTenantQuery;
 use Carbon\CarbonImmutable;
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -174,7 +175,15 @@ final class IngestSignalEvent implements SignalEventIngestor
     {
         $occurredAt = $payload['occurred_at'] ?? null;
 
-        return is_string($occurredAt) ? CarbonImmutable::parse($occurredAt) : CarbonImmutable::now();
+        if (! is_string($occurredAt) || mb_trim($occurredAt) === '') {
+            return CarbonImmutable::now();
+        }
+
+        try {
+            return CarbonImmutable::parse($occurredAt);
+        } catch (InvalidFormatException) {
+            return CarbonImmutable::now();
+        }
     }
 
     private function syncOwnerFromProperty(object $model, TrackedProperty $trackedProperty): void

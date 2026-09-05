@@ -8,6 +8,7 @@ use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
 use AIArmada\Signals\Models\Concerns\AutoAssignsSignalOwnerOnCreate;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -95,7 +96,7 @@ final class SignalAlertLog extends Model
 
     public function markAsRead(): void
     {
-        $this->update(['read_at' => now()]);
+        $this->update(['read_at' => CarbonImmutable::now()]);
     }
 
     public function markAsUnread(): void

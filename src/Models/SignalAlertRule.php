@@ -11,6 +11,7 @@ use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeKey;
 use AIArmada\Signals\Models\Concerns\AutoAssignsSignalOwnerOnCreate;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -149,12 +150,12 @@ final class SignalAlertRule extends Model implements Auditable
             return 0;
         }
 
-        return (int) now()->diffInMinutes($this->last_triggered_at->copy()->addMinutes($this->cooldown_minutes));
+        return (int) CarbonImmutable::now()->diffInMinutes($this->last_triggered_at->copy()->addMinutes($this->cooldown_minutes));
     }
 
     public function markTriggered(): void
     {
-        $this->update(['last_triggered_at' => now()]);
+        $this->update(['last_triggered_at' => CarbonImmutable::now()]);
     }
 
     public static function ownerScopingEnabled(): bool

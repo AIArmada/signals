@@ -10,6 +10,7 @@ use AIArmada\Signals\Models\SignalSession;
 use AIArmada\Signals\Models\TrackedProperty;
 use AIArmada\Signals\Services\SignalUserAgentParser;
 use Carbon\CarbonImmutable;
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 
@@ -36,9 +37,8 @@ final class ResolveSession
             ->where('session_identifier', $sessionIdentifier)
             ->first();
 
-        $startedAt = isset($payload['session_started_at']) && is_string($payload['session_started_at'])
-            ? CarbonImmutable::parse($payload['session_started_at'])
-            : $this->resolveOccurredAt($payload);
+        $startedAt = $this->parseTimestamp($payload['session_started_at'] ?? null)
+            ?? $this->resolveOccurredAt($payload);
 
         if (! $session instanceof SignalSession) {
             $session = new SignalSession([
@@ -158,7 +158,20 @@ final class ResolveSession
     {
         $occurredAt = $payload['occurred_at'] ?? null;
 
-        return is_string($occurredAt) ? CarbonImmutable::parse($occurredAt) : CarbonImmutable::now();
+        return $this->parseTimestamp($occurredAt) ?? CarbonImmutable::now();
+    }
+
+    private function parseTimestamp(mixed $value): ?CarbonImmutable
+    {
+        if (! is_string($value) || mb_trim($value) === '') {
+            return null;
+        }
+
+        try {
+            return CarbonImmutable::parse($value);
+        } catch (InvalidFormatException) {
+            return null;
+        }
     }
 
     private function syncOwnerFromProperty(object $model, TrackedProperty $trackedProperty): void

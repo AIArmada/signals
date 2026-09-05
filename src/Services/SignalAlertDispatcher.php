@@ -8,6 +8,7 @@ use AIArmada\Signals\Jobs\DispatchSignalAlertDelivery;
 use AIArmada\Signals\Models\SignalAlertDelivery;
 use AIArmada\Signals\Models\SignalAlertLog;
 use AIArmada\Signals\Models\SignalAlertRule;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 final class SignalAlertDispatcher
@@ -52,7 +53,7 @@ final class SignalAlertDispatcher
                             'destination' => $entry['destination'],
                             'status' => 'pending',
                             'max_attempts' => max(1, (int) config('signals.features.alerts.delivery.max_attempts', 5)),
-                            'available_at' => now(),
+                            'available_at' => CarbonImmutable::now(),
                             'owner_type' => $log->owner_type,
                             'owner_id' => $log->owner_id,
                         ],

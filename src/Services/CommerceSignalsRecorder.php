@@ -8,6 +8,7 @@ use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\Signals\Actions\IngestSignalEvent;
 use AIArmada\Signals\Models\SignalEvent;
 use AIArmada\Signals\Models\TrackedProperty;
+use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 
@@ -667,7 +668,7 @@ final class CommerceSignalsRecorder
         return $this->ingestSignalEvent->handle($trackedProperty, [
             'event_name' => $eventName,
             'event_category' => $data['event_category'] ?? 'commerce',
-            'occurred_at' => $this->timestampValue($data['occurred_at'] ?? now()),
+            'occurred_at' => $this->timestampValue($data['occurred_at'] ?? CarbonImmutable::now()),
             'revenue_minor' => (int) ($data['revenue_minor'] ?? 0),
             'currency' => (string) ($data['currency'] ?? config('signals.defaults.currency', 'MYR')),
             'external_id' => $data['external_id'] ?? null,
@@ -695,7 +696,7 @@ final class CommerceSignalsRecorder
         return $this->ingestSignalEvent->handle($trackedProperty, [
             'event_name' => $eventName,
             'event_category' => $category,
-            'occurred_at' => $this->timestampValue(now()),
+            'occurred_at' => $this->timestampValue(CarbonImmutable::now()),
             'revenue_minor' => 0,
             'currency' => (string) config('signals.defaults.currency', 'MYR'),
             'properties' => array_filter([
