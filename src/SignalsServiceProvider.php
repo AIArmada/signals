@@ -47,11 +47,14 @@ use AIArmada\Signals\Support\Browser\SignalsBrowserContextResolver;
 use AIArmada\Signals\Support\Browser\SignalsTrackerRenderer;
 use AIArmada\Signals\Support\CommerceSignalsIntegrationRegistrar;
 use AIArmada\Signals\Support\Http\Middleware\BootstrapSignalsBrowserContext;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Foundation\Http\Kernel;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -99,11 +102,24 @@ final class SignalsServiceProvider extends PackageServiceProvider
 
     public function packageBooted(): void
     {
+        $this->registerIngestionRateLimiter();
         $this->registerMorphMap();
         $this->registerSignalsTrackerDirective();
         $this->registerBrowserMiddleware();
         $this->registerBrowserAutoInjection();
         app(CommerceSignalsIntegrationRegistrar::class)->boot();
+    }
+
+    private function registerIngestionRateLimiter(): void
+    {
+        RateLimiter::for('signals-collect', static function (Request $request): array {
+            $limit = max(1, (int) config('signals.ingestion.browser.rate_limit_per_minute', 120));
+
+            return [
+                Limit::perMinute($limit)->by('signals:collect:ip:' . ($request->ip() ?? 'unknown')),
+                Limit::perMinute($limit)->by('signals:collect:write-key:' . hash('sha256', (string) $request->input('write_key', ''))),
+            ];
+        });
     }
 
     private function registerReports(): void

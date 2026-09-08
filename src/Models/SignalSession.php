@@ -6,7 +6,6 @@ namespace AIArmada\Signals\Models;
 
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
-use AIArmada\Signals\Models\Concerns\AutoAssignsSignalOwnerOnCreate;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -66,7 +65,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 final class SignalSession extends Model
 {
-    use AutoAssignsSignalOwnerOnCreate;
     use HasOwner;
     use HasOwnerScopeConfig;
     use HasUuids;

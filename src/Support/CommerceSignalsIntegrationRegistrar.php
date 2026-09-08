@@ -4,26 +4,7 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Support;
 
-use AIArmada\Signals\Listeners\RecordAffiliateAttributedSignal;
-use AIArmada\Signals\Listeners\RecordAffiliateConversionRecordedSignal;
-use AIArmada\Signals\Listeners\RecordApplicationApprovedSignal;
-use AIArmada\Signals\Listeners\RecordApplicationSubmittedSignal;
-use AIArmada\Signals\Listeners\RecordCartAbandonedSignal;
-use AIArmada\Signals\Listeners\RecordCartCheckoutStartedSignal;
-use AIArmada\Signals\Listeners\RecordCartClearedSignal;
-use AIArmada\Signals\Listeners\RecordCartItemAddedSignal;
-use AIArmada\Signals\Listeners\RecordCartItemRemovedSignal;
-use AIArmada\Signals\Listeners\RecordCartSnapshotSyncedSignal;
-use AIArmada\Signals\Listeners\RecordCheckoutCompletedSignal;
-use AIArmada\Signals\Listeners\RecordCheckoutStartedSignal;
-use AIArmada\Signals\Listeners\RecordHighValueCartDetectedSignal;
-use AIArmada\Signals\Listeners\RecordNetworkConversionRecordedSignal;
-use AIArmada\Signals\Listeners\RecordOfferCreatedSignal;
-use AIArmada\Signals\Listeners\RecordOfferUpdatedSignal;
-use AIArmada\Signals\Listeners\RecordOrderPaidSignal;
-use AIArmada\Signals\Listeners\RecordOrderRefundedSignal;
-use AIArmada\Signals\Listeners\RecordVoucherAppliedSignal;
-use AIArmada\Signals\Listeners\RecordVoucherRemovedSignal;
+use AIArmada\Signals\Listeners\RecordCommerceSignal;
 use Illuminate\Support\Facades\Event;
 
 final class CommerceSignalsIntegrationRegistrar
@@ -46,11 +27,11 @@ final class CommerceSignalsIntegrationRegistrar
         }
 
         if (config('signals.integrations.affiliates.listen_for_attributed', true)) {
-            $this->listenIfAvailable('AIArmada\\Affiliates\\Events\\AffiliateAttributed', RecordAffiliateAttributedSignal::class);
+            $this->listenIfAvailable('AIArmada\\Affiliates\\Events\\AffiliateAttributed');
         }
 
         if (config('signals.integrations.affiliates.listen_for_conversion_recorded', true)) {
-            $this->listenIfAvailable('AIArmada\\Affiliates\\Events\\AffiliateConversionRecorded', RecordAffiliateConversionRecordedSignal::class);
+            $this->listenIfAvailable('AIArmada\\Affiliates\\Events\\AffiliateConversionRecorded');
         }
     }
 
@@ -61,15 +42,15 @@ final class CommerceSignalsIntegrationRegistrar
         }
 
         if (config('signals.integrations.cart.listen_for_item_added', true)) {
-            $this->listenIfAvailable('AIArmada\\Cart\\Events\\ItemAdded', RecordCartItemAddedSignal::class);
+            $this->listenIfAvailable('AIArmada\\Cart\\Events\\ItemAdded');
         }
 
         if (config('signals.integrations.cart.listen_for_item_removed', true)) {
-            $this->listenIfAvailable('AIArmada\\Cart\\Events\\ItemRemoved', RecordCartItemRemovedSignal::class);
+            $this->listenIfAvailable('AIArmada\\Cart\\Events\\ItemRemoved');
         }
 
         if (config('signals.integrations.cart.listen_for_cleared', true)) {
-            $this->listenIfAvailable('AIArmada\\Cart\\Events\\CartCleared', RecordCartClearedSignal::class);
+            $this->listenIfAvailable('AIArmada\\Cart\\Events\\CartCleared');
         }
     }
 
@@ -80,19 +61,19 @@ final class CommerceSignalsIntegrationRegistrar
         }
 
         if (config('signals.integrations.filament_cart.listen_for_snapshot_synced', true)) {
-            $this->listenIfAvailable('AIArmada\\FilamentCart\\Events\\CartSnapshotSynced', RecordCartSnapshotSyncedSignal::class);
+            $this->listenIfAvailable('AIArmada\\FilamentCart\\Events\\CartSnapshotSynced');
         }
 
         if (config('signals.integrations.filament_cart.listen_for_checkout_started', true)) {
-            $this->listenIfAvailable('AIArmada\\FilamentCart\\Events\\CartCheckoutStarted', RecordCartCheckoutStartedSignal::class);
+            $this->listenIfAvailable('AIArmada\\FilamentCart\\Events\\CartCheckoutStarted');
         }
 
         if (config('signals.integrations.filament_cart.listen_for_abandoned', true)) {
-            $this->listenIfAvailable('AIArmada\\FilamentCart\\Events\\CartAbandoned', RecordCartAbandonedSignal::class);
+            $this->listenIfAvailable('AIArmada\\FilamentCart\\Events\\CartAbandoned');
         }
 
         if (config('signals.integrations.filament_cart.listen_for_high_value_detected', true)) {
-            $this->listenIfAvailable('AIArmada\\FilamentCart\\Events\\HighValueCartDetected', RecordHighValueCartDetectedSignal::class);
+            $this->listenIfAvailable('AIArmada\\FilamentCart\\Events\\HighValueCartDetected');
         }
     }
 
@@ -103,14 +84,14 @@ final class CommerceSignalsIntegrationRegistrar
         }
 
         if (config('signals.integrations.checkout.listen_for_started', true)) {
-            $this->listenIfAvailable('AIArmada\\Checkout\\Events\\CheckoutStarted', RecordCheckoutStartedSignal::class);
+            $this->listenIfAvailable('AIArmada\\Checkout\\Events\\CheckoutStarted');
         }
 
         if (! config('signals.integrations.checkout.listen_for_completed', true)) {
             return;
         }
 
-        $this->listenIfAvailable('AIArmada\\Checkout\\Events\\CheckoutCompleted', RecordCheckoutCompletedSignal::class);
+        $this->listenIfAvailable('AIArmada\\Checkout\\Events\\CheckoutCompleted');
     }
 
     private function bootOrdersIntegration(): void
@@ -124,14 +105,14 @@ final class CommerceSignalsIntegrationRegistrar
                 return;
             }
         } else {
-            $this->listenIfAvailable('AIArmada\\Orders\\Events\\OrderPaid', RecordOrderPaidSignal::class);
+            $this->listenIfAvailable('AIArmada\\Orders\\Events\\OrderPaid');
         }
 
         if (! config('signals.integrations.orders.listen_for_refunded', true)) {
             return;
         }
 
-        $this->listenIfAvailable('AIArmada\\Orders\\Events\\OrderRefunded', RecordOrderRefundedSignal::class);
+        $this->listenIfAvailable('AIArmada\\Orders\\Events\\OrderRefunded');
     }
 
     private function bootVoucherIntegration(): void
@@ -141,11 +122,11 @@ final class CommerceSignalsIntegrationRegistrar
         }
 
         if (config('signals.integrations.vouchers.listen_for_applied', true)) {
-            $this->listenIfAvailable('AIArmada\\Vouchers\\Events\\VoucherApplied', RecordVoucherAppliedSignal::class);
+            $this->listenIfAvailable('AIArmada\\Vouchers\\Events\\VoucherApplied');
         }
 
         if (config('signals.integrations.vouchers.listen_for_removed', true)) {
-            $this->listenIfAvailable('AIArmada\\Vouchers\\Events\\VoucherRemoved', RecordVoucherRemovedSignal::class);
+            $this->listenIfAvailable('AIArmada\\Vouchers\\Events\\VoucherRemoved');
         }
     }
 
@@ -156,32 +137,32 @@ final class CommerceSignalsIntegrationRegistrar
         }
 
         if (config('signals.integrations.affiliate_network.listen_for_offer_created', true)) {
-            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\OfferCreated', RecordOfferCreatedSignal::class);
+            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\OfferCreated');
         }
 
         if (config('signals.integrations.affiliate_network.listen_for_offer_updated', true)) {
-            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\OfferUpdated', RecordOfferUpdatedSignal::class);
+            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\OfferUpdated');
         }
 
         if (config('signals.integrations.affiliate_network.listen_for_application_submitted', true)) {
-            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\ApplicationSubmitted', RecordApplicationSubmittedSignal::class);
+            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\ApplicationSubmitted');
         }
 
         if (config('signals.integrations.affiliate_network.listen_for_application_approved', true)) {
-            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\ApplicationApproved', RecordApplicationApprovedSignal::class);
+            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\ApplicationApproved');
         }
 
         if (config('signals.integrations.affiliate_network.listen_for_network_conversion_recorded', true)) {
-            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\NetworkConversionRecorded', RecordNetworkConversionRecordedSignal::class);
+            $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\NetworkConversionRecorded');
         }
     }
 
-    private function listenIfAvailable(string $eventClass, string $listenerClass): void
+    private function listenIfAvailable(string $eventClass): void
     {
         if (! class_exists($eventClass)) {
             return;
         }
 
-        Event::listen($eventClass, $listenerClass);
+        Event::listen($eventClass, RecordCommerceSignal::class);
     }
 }

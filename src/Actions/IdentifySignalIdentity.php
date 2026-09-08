@@ -76,6 +76,10 @@ final class IdentifySignalIdentity
             ]);
         }
 
+        $this->requestValidator->assertPublicPayload(
+            request: $request,
+            writeKey: (string) $payload['write_key'],
+        );
         $trackedProperty = $this->requestValidator->resolveTrackedProperty($request, (string) $payload['write_key']);
         $identity = $this->handle($trackedProperty, $payload);
 

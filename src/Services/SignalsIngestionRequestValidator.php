@@ -50,10 +50,24 @@ final class SignalsIngestionRequestValidator
 
     public function assertBrowserPayload(Request $request, string $writeKey, string $eventName): void
     {
+        $this->assertPublicPayload($request, $writeKey, $eventName);
+    }
+
+    public function assertPublicPayload(Request $request, string $writeKey, ?string $eventName = null): void
+    {
         $this->assertPayloadWithinLimits($request, 'browser');
-        $this->assertUntrustedEvent($eventName, $request->all());
+        if ($eventName === null) {
+            $this->assertBrowserPayloadContainsNoTrustedFields($request->all());
+        } else {
+            $this->assertUntrustedEvent($eventName, $request->all());
+        }
+
         $this->assertRateLimit(
-            key: 'signals:browser:' . hash('sha256', $writeKey) . ':' . ($request->ip() ?? 'unknown'),
+            key: 'signals:browser:property:' . hash('sha256', $writeKey),
+            attempts: max(1, (int) config('signals.ingestion.browser.property_rate_limit_per_minute', 120)),
+        );
+        $this->assertRateLimit(
+            key: 'signals:browser:ip:' . ($request->ip() ?? 'unknown'),
             attempts: max(1, (int) config('signals.ingestion.browser.rate_limit_per_minute', 120)),
         );
     }

@@ -104,6 +104,7 @@ Owner mode is opt-in for Signals. With the default config, browser/global analyt
         'max_keys' => 64,
         'max_string_bytes' => 1024,
         'rate_limit_per_minute' => 120,
+        'property_rate_limit_per_minute' => 120,
     ],
     'trusted' => [
         'max_bytes' => 32768,
@@ -117,7 +118,11 @@ Owner mode is opt-in for Signals. With the default config, browser/global analyt
 ],
 ```
 
-The public browser route accepts only allowlisted non-financial events. Revenue and transaction identifiers belong on the signed trusted-outcome route. Payload limits and rate limits apply before browser event persistence.
+The four public collect routes (`identify`, `browser-event`, `pageview`, and `geo`) use the named `signals-collect` throttle. It applies an IP limit and a write-key limit before the controller runs. The request validator adds payload caps, the browser event allowlist, forbidden financial-field checks, and a second IP/property limiter before persistence. Revenue and transaction identifiers belong on the signed trusted-outcome route.
+
+`rate_limit_per_minute` controls the shared IP limit. `property_rate_limit_per_minute` limits traffic for one tracked property even when requests come from different IP addresses. The tracker script and signed `server-outcome` route are not in the public collect throttle; the latter has its own signature, replay, payload, and trusted-ingestion limits.
+
+Browser payloads remain lenient at the parsing boundary because they are untrusted and may be sent by older clients. Trusted server-side commerce recorders use strict required-field extraction and throw when a required upstream field is absent, preventing silent zero-value metrics after an upstream contract changes.
 
 ## Features
 

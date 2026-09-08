@@ -10,7 +10,6 @@ use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeKey;
-use AIArmada\Signals\Models\Concerns\AutoAssignsSignalOwnerOnCreate;
 use AIArmada\Signals\Services\SignalEventConditionDefinition;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -40,7 +39,6 @@ final class SignalSegment extends Model implements Auditable
         'any',
     ];
 
-    use AutoAssignsSignalOwnerOnCreate;
     use HasCommerceAudit;
     use HasOwner;
     use HasOwnerScopeConfig;

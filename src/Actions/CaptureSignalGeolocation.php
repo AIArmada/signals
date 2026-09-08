@@ -108,6 +108,10 @@ final class CaptureSignalGeolocation
         ]);
 
         // Validate write key resolves to a tracked property (raises 403 on failure)
+        $this->requestValidator->assertPublicPayload(
+            request: $request,
+            writeKey: (string) $payload['write_key'],
+        );
         $trackedProperty = $this->requestValidator->resolveTrackedProperty($request, (string) $payload['write_key']);
 
         $this->handle($payload, $trackedProperty);

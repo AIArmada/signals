@@ -10,7 +10,6 @@ use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeKey;
-use AIArmada\Signals\Models\Concerns\AutoAssignsSignalOwnerOnCreate;
 use AIArmada\Signals\Services\SignalEventConditionDefinition;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -36,7 +35,6 @@ use RuntimeException;
  */
 final class SignalGoal extends Model implements Auditable
 {
-    use AutoAssignsSignalOwnerOnCreate;
     use HasCommerceAudit;
     use HasOwner;
     use HasOwnerScopeConfig;

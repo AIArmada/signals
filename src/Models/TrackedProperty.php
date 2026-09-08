@@ -9,7 +9,6 @@ use AIArmada\CommerceSupport\Concerns\LogsCommerceActivity;
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeKey;
-use AIArmada\Signals\Models\Concerns\AutoAssignsSignalOwnerOnCreate;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -44,7 +43,6 @@ use OwenIt\Auditing\Contracts\Auditable;
  */
 final class TrackedProperty extends Model implements Auditable
 {
-    use AutoAssignsSignalOwnerOnCreate;
     use HasCommerceAudit;
     use HasOwner;
     use HasOwnerScopeConfig;

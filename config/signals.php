@@ -302,6 +302,7 @@ return [
             'max_keys' => 64,
             'max_string_bytes' => 1024,
             'rate_limit_per_minute' => 120,
+            'property_rate_limit_per_minute' => 120,
         ],
         'trusted' => [
             'max_bytes' => 32768,

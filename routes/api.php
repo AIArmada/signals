@@ -17,17 +17,19 @@ Route::middleware(config('signals.http.middleware', ['api']))
         Route::get('/' . config('signals.http.tracker_script', 'tracker.js'), [ServeSignalsTracker::class, 'asController'])
             ->name('signals.tracker.script');
 
-        Route::post('/collect/identify', [IdentifySignalIdentity::class, 'asController'])
-            ->name('signals.collect.identify');
+        Route::middleware('throttle:signals-collect')->group(function (): void {
+            Route::post('/collect/identify', [IdentifySignalIdentity::class, 'asController'])
+                ->name('signals.collect.identify');
 
-        Route::post('/collect/browser-event', [IngestSignalEvent::class, 'asController'])
-            ->name('signals.collect.browser-event');
+            Route::post('/collect/browser-event', [IngestSignalEvent::class, 'asController'])
+                ->name('signals.collect.browser-event');
 
-        Route::post('/collect/pageview', [CaptureSignalPageView::class, 'asController'])
-            ->name('signals.collect.pageview');
+            Route::post('/collect/pageview', [CaptureSignalPageView::class, 'asController'])
+                ->name('signals.collect.pageview');
 
-        Route::post('/collect/geo', [CaptureSignalGeolocation::class, 'asController'])
-            ->name('signals.collect.geo');
+            Route::post('/collect/geo', [CaptureSignalGeolocation::class, 'asController'])
+                ->name('signals.collect.geo');
+        });
 
         Route::post('/collect/server-outcome', [IngestTrustedSignalOutcome::class, 'asController'])
             ->middleware(VerifyTrustedSignalSignature::class)
