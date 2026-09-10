@@ -61,19 +61,19 @@ final class SignalEventMap
                 'method' => 'recordCartCleared',
                 'arguments' => [['property' => 'cart', 'type' => 'object']],
             ],
-            'AIArmada\\FilamentCart\\Events\\CartSnapshotSynced' => [
+            'AIArmada\\Cart\\Events\\CartSnapshotSynced' => [
                 'method' => 'recordCartSnapshotSynced',
                 'arguments' => [['property' => null, 'type' => 'event']],
             ],
-            'AIArmada\\FilamentCart\\Events\\CartCheckoutStarted' => [
+            'AIArmada\\Cart\\Events\\CartCheckoutStarted' => [
                 'method' => 'recordCartCheckoutStarted',
                 'arguments' => [['property' => null, 'type' => 'event']],
             ],
-            'AIArmada\\FilamentCart\\Events\\CartAbandoned' => [
+            'AIArmada\\Cart\\Events\\CartAbandoned' => [
                 'method' => 'recordCartAbandoned',
                 'arguments' => [['property' => null, 'type' => 'event']],
             ],
-            'AIArmada\\FilamentCart\\Events\\HighValueCartDetected' => [
+            'AIArmada\\Cart\\Events\\HighValueCartDetected' => [
                 'method' => 'recordHighValueCartDetected',
                 'arguments' => [['property' => null, 'type' => 'event']],
             ],

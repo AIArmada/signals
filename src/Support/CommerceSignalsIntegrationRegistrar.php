@@ -61,19 +61,19 @@ final class CommerceSignalsIntegrationRegistrar
         }
 
         if (config('signals.integrations.filament_cart.listen_for_snapshot_synced', true)) {
-            $this->listenIfAvailable('AIArmada\\FilamentCart\\Events\\CartSnapshotSynced');
+            $this->listenIfAvailable('AIArmada\\Cart\\Events\\CartSnapshotSynced');
         }
 
         if (config('signals.integrations.filament_cart.listen_for_checkout_started', true)) {
-            $this->listenIfAvailable('AIArmada\\FilamentCart\\Events\\CartCheckoutStarted');
+            $this->listenIfAvailable('AIArmada\\Cart\\Events\\CartCheckoutStarted');
         }
 
         if (config('signals.integrations.filament_cart.listen_for_abandoned', true)) {
-            $this->listenIfAvailable('AIArmada\\FilamentCart\\Events\\CartAbandoned');
+            $this->listenIfAvailable('AIArmada\\Cart\\Events\\CartAbandoned');
         }
 
         if (config('signals.integrations.filament_cart.listen_for_high_value_detected', true)) {
-            $this->listenIfAvailable('AIArmada\\FilamentCart\\Events\\HighValueCartDetected');
+            $this->listenIfAvailable('AIArmada\\Cart\\Events\\HighValueCartDetected');
         }
     }
 
