@@ -45,7 +45,7 @@ final class RecordCommerceSignal
             }
 
             if ($argument['type'] === 'scalar' && $argument['property'] !== 'transactionId' && $value === null) {
-                // Nullable scalar fields retain each legacy listener's default.
+                // Nullable scalar fields default to null.
                 $value = null;
             }
 

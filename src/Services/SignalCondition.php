@@ -268,13 +268,16 @@ final class SignalCondition
         }
 
         $escapedLikeValue = self::escapeLike($value);
+        $likeOperator = ConnectionDriver::name($query->getConnection()) === 'pgsql'
+            ? 'ILIKE'
+            : 'LIKE';
 
         match ($operator) {
             'equals' => $query->where($field, $value),
             'not_equals' => $query->where($field, '!=', $value),
-            'contains' => $query->where($field, 'like', '%' . $escapedLikeValue . '%'),
-            'starts_with' => $query->where($field, 'like', $escapedLikeValue . '%'),
-            'ends_with' => $query->where($field, 'like', '%' . $escapedLikeValue),
+            'contains' => $query->where($field, $likeOperator, '%' . $escapedLikeValue . '%'),
+            'starts_with' => $query->where($field, $likeOperator, $escapedLikeValue . '%'),
+            'ends_with' => $query->where($field, $likeOperator, '%' . $escapedLikeValue),
             'greater_than' => $query->where($field, '>', $value),
             'greater_than_or_equal' => $query->where($field, '>=', $value),
             'less_than' => $query->where($field, '<', $value),
@@ -294,13 +297,16 @@ final class SignalCondition
     {
         $escapedLikeValue = self::escapeLike($value);
         $textExpression = self::jsonTextExpression($query, 'properties', $propertySegments);
+        $likeOperator = ConnectionDriver::name($query->getConnection()) === 'pgsql'
+            ? 'ILIKE'
+            : 'LIKE';
 
         match ($operator) {
             'equals' => $query->whereRaw("{$textExpression} = ?", [$value]),
             'not_equals' => $query->whereRaw("{$textExpression} IS NOT NULL")->whereRaw("{$textExpression} <> ?", [$value]),
-            'contains' => $query->whereRaw("{$textExpression} LIKE ? ESCAPE '\\'", ['%' . $escapedLikeValue . '%']),
-            'starts_with' => $query->whereRaw("{$textExpression} LIKE ? ESCAPE '\\'", [$escapedLikeValue . '%']),
-            'ends_with' => $query->whereRaw("{$textExpression} LIKE ? ESCAPE '\\'", ['%' . $escapedLikeValue]),
+            'contains' => $query->whereRaw("{$textExpression} {$likeOperator} ? ESCAPE '\\'", ['%' . $escapedLikeValue . '%']),
+            'starts_with' => $query->whereRaw("{$textExpression} {$likeOperator} ? ESCAPE '\\'", [$escapedLikeValue . '%']),
+            'ends_with' => $query->whereRaw("{$textExpression} {$likeOperator} ? ESCAPE '\\'", ['%' . $escapedLikeValue]),
             'greater_than' => self::applyNumericProperty($query, $propertySegments, '>', $value),
             'greater_than_or_equal' => self::applyNumericProperty($query, $propertySegments, '>=', $value),
             'less_than' => self::applyNumericProperty($query, $propertySegments, '<', $value),
