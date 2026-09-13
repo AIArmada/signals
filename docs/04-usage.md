@@ -89,6 +89,8 @@ Optional device fields can be passed explicitly. When `ua_parsing` is enabled th
 
 The browser route is deliberately non-financial. It enforces a configurable event allowlist, bounded payload size/depth/key counts, and rate limiting by write key plus client address. Revenue, currency, order/conversion/transaction identifiers, source event IDs, and client-controlled idempotency keys are rejected. `Origin`, `Referer`, and the page URL are domain-policy signals only; they are not authentication.
 
+Collect limits live in `signals.ingestion.browser` (full table in `03-configuration.md`): the four public routes (`identify`, `browser-event`, `pageview`, `geo`) share the named `throttle:signals-collect` limiter plus per-IP (`rate_limit_per_minute`, 120) and per-property (`property_rate_limit_per_minute`, 120) checks, payload caps (`max_bytes` 32768, `max_depth` 4, `max_keys` 64), and the `event_allowlist`.
+
 ### Trusted Server Outcome
 
 `POST /api/signals/collect/server-outcome`
@@ -296,6 +298,8 @@ $recorder->recordAffiliateConversionRecorded($conversion);
 ```
 
 The `signals.recording.events.*` toggles let you disable selected built-in recorder outputs without removing the surrounding integration.
+
+Field mapping lives in per-source recorders (`AIArmada\Signals\Services\Recorders\CartSignalRecorder`, `CheckoutSignalRecorder`, `OrderSignalRecorder`, `FilamentCartSignalRecorder`, `VoucherSignalRecorder`, `AffiliateSignalRecorder`, `AffiliateNetworkSignalRecorder`); `CommerceSignalsRecorder` stays the stable dispatcher. Trusted paths fail loud — `SignalRecorderSupport::requiredModelInt()` and friends throw `InvalidArgumentException` on missing fields. Browser ingestion stays lenient: `IngestSignalEvent` (`trusted: false`) defaults missing fields and forces `revenue_minor` to `0`.
 
 ## Actions
 
