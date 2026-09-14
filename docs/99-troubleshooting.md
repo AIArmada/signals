@@ -43,6 +43,10 @@ title: Troubleshooting
 - Verify the browser granted geolocation permission.
 - Confirm `POST /api/signals/collect/geo` is reachable through the configured Signals HTTP prefix.
 
+## Cloudflare IP / Country Headers Are Ignored
+
+- `CF-Connecting-IP` and `CF-IPCountry` are honored only when the request arrives through a trusted proxy. Configure Laravel trusted proxies (`TrustProxies` middleware or `Request::setTrustedProxies()`) so the proxy addresses are trusted; otherwise the headers are ignored and the payload values (if any) are used.
+
 ## Reverse-Geocoded Fields Stay Null
 
 - Ensure `signals.features.geolocation.reverse_geocode.enabled` is true.

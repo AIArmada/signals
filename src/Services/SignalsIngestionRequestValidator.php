@@ -55,6 +55,7 @@ final class SignalsIngestionRequestValidator
 
     public function assertPublicPayload(Request $request, string $writeKey, ?string $eventName = null): void
     {
+        $this->assertWriteKeyNotInQueryString($request);
         $this->assertPayloadWithinLimits($request, 'browser');
         if ($eventName === null) {
             $this->assertBrowserPayloadContainsNoTrustedFields($request->all());
@@ -86,6 +87,7 @@ final class SignalsIngestionRequestValidator
 
     public function assertTrustedPayloadWithinLimits(Request $request): void
     {
+        $this->assertWriteKeyNotInQueryString($request);
         $this->assertPayloadWithinLimits($request, 'trusted');
         $this->assertRateLimit(
             key: 'signals:trusted:' . ($request->ip() ?? 'unknown'),
@@ -102,11 +104,22 @@ final class SignalsIngestionRequestValidator
             ->firstOrFail();
     }
 
+    private function assertWriteKeyNotInQueryString(Request $request): void
+    {
+        if ($request->query('write_key') !== null) {
+            throw ValidationException::withMessages([
+                'write_key' => 'The write key must be sent in the request body, not the query string.',
+            ]);
+        }
+    }
+
     private function assertPayloadWithinLimits(Request $request, string $boundary): void
     {
         $maxBytes = max(1024, (int) config("signals.ingestion.{$boundary}.max_bytes", 32768));
 
-        if (mb_strlen($request->getContent()) > $maxBytes) {
+        $content = $request->getContent();
+
+        if (is_string($content) && mb_strlen($content) > $maxBytes) {
             throw ValidationException::withMessages([
                 'payload' => "The {$boundary} Signals payload exceeds {$maxBytes} bytes.",
             ]);

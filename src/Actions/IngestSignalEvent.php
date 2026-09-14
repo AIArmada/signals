@@ -15,10 +15,13 @@ use AIArmada\Signals\Models\TrackedProperty;
 use AIArmada\Signals\Services\SignalAlertDispatcher;
 use AIArmada\Signals\Services\SignalAlertEvaluator;
 use AIArmada\Signals\Services\SignalEventPropertyTypeInferrer;
+use AIArmada\Signals\Services\SignalPropertyFilter;
 use AIArmada\Signals\Services\SignalsIngestionRequestValidator;
 use AIArmada\Signals\Support\CrossTenantQuery;
+use AIArmada\Signals\Support\DuplicateKeyViolation;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -31,6 +34,7 @@ final class IngestSignalEvent implements SignalEventIngestor
         private readonly SignalEventPropertyTypeInferrer $propertyTypeInferrer,
         private readonly SignalsIngestionRequestValidator $requestValidator,
         private readonly ResolveSession $resolveSession,
+        private readonly SignalPropertyFilter $propertyFilter,
     ) {}
 
     /**
@@ -44,9 +48,8 @@ final class IngestSignalEvent implements SignalEventIngestor
         $rawProperties = is_array($payload['properties'] ?? null) ? $payload['properties'] : null;
         $properties = $trusted ? $rawProperties : $this->filterProperties($rawProperties);
         $sourceEventId = $trusted ? $this->stringValue($payload['source_event_id'] ?? null) : null;
-        $idempotencyKey = $trusted
-            ? $this->stringValue($payload['idempotency_key'] ?? null) ?? $sourceEventId
-            : null;
+        $idempotencyKey = $this->stringValue($payload['idempotency_key'] ?? null)
+            ?? ($trusted ? $sourceEventId : null);
 
         if ($idempotencyKey !== null) {
             $existing = CrossTenantQuery::findExistingEvent($trackedProperty, $idempotencyKey);
@@ -73,7 +76,7 @@ final class IngestSignalEvent implements SignalEventIngestor
             'campaign' => $payload['campaign'] ?? ($payload['utm_campaign'] ?? $session?->utm_campaign),
             'content' => $payload['content'] ?? ($payload['utm_content'] ?? $session?->utm_content),
             'term' => $payload['term'] ?? ($payload['utm_term'] ?? $session?->utm_term),
-            'revenue_minor' => $trusted ? (int) ($payload['revenue_minor'] ?? 0) : 0,
+            'revenue_minor' => $trusted ? $this->normalizeRevenueMinor($payload['revenue_minor'] ?? 0) : 0,
             'currency' => $trusted
                 ? (string) ($payload['currency'] ?? $trackedProperty->currency)
                 : (string) $trackedProperty->currency,
@@ -82,7 +85,20 @@ final class IngestSignalEvent implements SignalEventIngestor
         ]);
 
         $this->syncOwnerFromProperty($event, $trackedProperty);
-        $this->withTrackedPropertyOwner($trackedProperty, static fn (): bool => $event->save());
+
+        try {
+            $this->withTrackedPropertyOwner($trackedProperty, static fn (): bool => $event->save());
+        } catch (QueryException $e) {
+            $existing = $idempotencyKey !== null && DuplicateKeyViolation::is($e)
+                ? CrossTenantQuery::findExistingEvent($trackedProperty, $idempotencyKey)
+                : null;
+
+            if (! $existing instanceof SignalEvent) {
+                throw $e;
+            }
+
+            return $existing;
+        }
 
         if ($session instanceof SignalSession) {
             $this->withTrackedPropertyOwner($trackedProperty, function () use ($session, $payload, $occurredAt, $event): bool {
@@ -90,7 +106,9 @@ final class IngestSignalEvent implements SignalEventIngestor
                 $session->ended_at = $occurredAt;
                 $durationMilliseconds = max(0, (int) ($session->started_at?->diffInMilliseconds($occurredAt) ?? 0));
                 $session->duration_milliseconds = $durationMilliseconds;
-                $hasOtherEvents = $session->events()->whereKeyNot($event->id)->exists();
+                $hasOtherEvents = $session->wasRecentlyCreated
+                    ? false
+                    : $session->events()->whereKeyNot($event->id)->exists();
                 $session->bounced_at = $hasOtherEvents ? null : $session->bounced_at ?? CarbonImmutable::now();
 
                 return $session->save();
@@ -137,6 +155,7 @@ final class IngestSignalEvent implements SignalEventIngestor
             'device_brand' => ['nullable', 'string', 'max:100'],
             'device_model' => ['nullable', 'string', 'max:100'],
             'is_bot' => ['nullable', 'boolean'],
+            'idempotency_key' => ['nullable', 'string', 'max:255'],
             'properties' => ['nullable', 'array'],
         ]);
 
@@ -250,37 +269,7 @@ final class IngestSignalEvent implements SignalEventIngestor
      */
     private function filterProperties(?array $properties): ?array
     {
-        if ($properties === null) {
-            return null;
-        }
-
-        $allowlist = config('signals.features.privacy.property_allowlist', []);
-        $allowedKeys = is_array($allowlist) ? array_values(array_filter($allowlist, 'is_string')) : [];
-
-        if (in_array('*', $allowedKeys, true)) {
-            return $properties;
-        }
-
-        $blockedKeys = [
-            'email',
-            'phone',
-            'name',
-            'first_name',
-            'last_name',
-            'customer_email',
-            'customer_phone',
-            'customer_name',
-            'metadata',
-            'cart_metadata',
-        ];
-
-        return array_filter(
-            $properties,
-            static fn (mixed $value, string $key): bool => in_array($key, $allowedKeys, true)
-                && ! in_array($key, $blockedKeys, true)
-                && (is_scalar($value) || is_array($value) || $value === null),
-            ARRAY_FILTER_USE_BOTH,
-        ) ?: null;
+        return $this->propertyFilter->filter($properties);
     }
 
     private function stringValue(mixed $value): ?string
@@ -290,5 +279,14 @@ final class IngestSignalEvent implements SignalEventIngestor
         }
 
         return is_scalar($value) ? (string) $value : null;
+    }
+
+    private function normalizeRevenueMinor(mixed $value): int
+    {
+        if (! is_numeric($value)) {
+            return 0;
+        }
+
+        return max(0, (int) round((float) $value));
     }
 }

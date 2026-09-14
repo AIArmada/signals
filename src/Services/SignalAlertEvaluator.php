@@ -8,7 +8,7 @@ use AIArmada\Signals\Models\SignalAlertRule;
 use AIArmada\Signals\Models\SignalEvent;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
+use Illuminate\Support\LazyCollection;
 
 final class SignalAlertEvaluator
 {
@@ -84,9 +84,9 @@ final class SignalAlertEvaluator
     }
 
     /**
-     * @param  Collection<int, SignalEvent>  $events
+     * @param  LazyCollection<int, SignalEvent>  $events
      */
-    private function calculateConversionRate(Collection $events): float
+    private function calculateConversionRate(LazyCollection $events): float
     {
         $pageViews = (float) $events->where('event_category', 'page_view')->count();
 
@@ -100,9 +100,9 @@ final class SignalAlertEvaluator
     }
 
     /**
-     * @param  Collection<int, SignalEvent>  $events
+     * @param  LazyCollection<int, SignalEvent>  $events
      */
-    private function calculatePropertyMetric(string $metricKey, Collection $events): float
+    private function calculatePropertyMetric(string $metricKey, LazyCollection $events): float
     {
         if (! str_contains($metricKey, ':')) {
             return 0.0;
@@ -123,14 +123,17 @@ final class SignalAlertEvaluator
     }
 
     /**
-     * @return Collection<int, SignalEvent>
+     * Stream matching events instead of hydrating the whole window, so
+     * high-volume timeframes cannot exhaust memory while filtering.
+     *
+     * @return LazyCollection<int, SignalEvent>
      */
-    private function filteredEvents(SignalAlertRule $rule): Collection
+    private function filteredEvents(SignalAlertRule $rule): LazyCollection
     {
         $filters = $this->eventFilters($rule);
 
         return $this->baseQuery($rule)
-            ->get()
+            ->cursor()
             ->filter(fn (SignalEvent $event): bool => $this->matchesPropertyFilters($event, $filters))
             ->values();
     }

@@ -114,7 +114,6 @@ return [
                 'commission_minor',
                 'conversion_id',
                 'conversion_type',
-                'cookie_value',
                 'currency',
                 'external_reference',
                 'experiment_contexts',
@@ -284,6 +283,18 @@ return [
             'listen_for_application_submitted' => true,
             'listen_for_application_approved' => true,
             'listen_for_network_conversion_recorded' => true,
+        ],
+    ],
+
+    /* Reporting bounds and row caps */
+    'reporting' => [
+        'funnel' => [
+            'default_window_days' => 90,
+            'max_events' => 25000,
+        ],
+        'retention' => [
+            'default_window_days' => 90,
+            'max_identities' => 25000,
         ],
     ],
 

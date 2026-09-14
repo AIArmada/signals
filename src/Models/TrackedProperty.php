@@ -52,6 +52,9 @@ final class TrackedProperty extends Model implements Auditable
 
     protected static string $ownerScopeConfigKey = 'signals.owner';
 
+    /** @var array<string, bool> */
+    private static array $tableExistsCache = [];
+
     /** @var list<string> */
     protected $hidden = [
         'owner_scope',
@@ -189,13 +192,17 @@ final class TrackedProperty extends Model implements Auditable
 
             if (class_exists($growthExperimentModel)) {
                 $growthExperiment = new $growthExperimentModel;
+                $growthTable = $growthExperiment->getTable();
 
-                if (Schema::hasTable($growthExperiment->getTable())) {
+                self::$tableExistsCache[$growthTable] ??= Schema::hasTable($growthTable);
+
+                if (self::$tableExistsCache[$growthTable]) {
                     $growthExperimentModel::query()
                         ->withoutOwnerScope()
                         ->where('tracked_property_id', $trackedProperty->getKey())
-                        ->get()
-                        ->each(static fn ($experiment): mixed => $experiment->delete());
+                        ->chunkById(500, static function ($experiments): void {
+                            $experiments->each(static fn ($experiment): mixed => $experiment->delete());
+                        });
                 }
             }
 

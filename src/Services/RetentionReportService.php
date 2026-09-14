@@ -99,8 +99,11 @@ final class RetentionReportService
      */
     private function cohorts(?string $trackedPropertyId, ?string $from, ?string $until, ?string $signalSegmentId, array $retentionWindows): Collection
     {
+        [$from, $until] = $this->resolveBounds($from, $until);
+
         /** @var Collection<int, array{cohort_date: string, cohort_size: int, windows: list<array{days: int, retained: int, retention_rate: float}>}> $cohorts */
         $cohorts = $this->baseQuery($trackedPropertyId, $from, $until, $signalSegmentId)
+            ->limit($this->maxIdentities())
             ->get()
             ->groupBy(function (SignalIdentity $identity): string {
                 return $identity->first_seen_at?->toDateString() ?? 'unknown';
@@ -201,5 +204,27 @@ final class RetentionReportService
             ->where('is_active', true)
             ->whereKey($savedReportId)
             ->first();
+    }
+
+    /**
+     * @return array{string|null, string|null}
+     */
+    private function resolveBounds(?string $from, ?string $until): array
+    {
+        if (filled($from) || filled($until)) {
+            return [$from, $until];
+        }
+
+        $windowDays = max(1, (int) config('signals.reporting.retention.default_window_days', 90));
+
+        return [
+            CarbonImmutable::now()->subDays($windowDays)->toDateString(),
+            CarbonImmutable::now()->toDateString(),
+        ];
+    }
+
+    private function maxIdentities(): int
+    {
+        return max(1, (int) config('signals.reporting.retention.max_identities', 25000));
     }
 }

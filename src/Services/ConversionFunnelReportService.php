@@ -169,7 +169,10 @@ final class ConversionFunnelReportService
         $counts = array_fill(0, count($steps), 0);
         $revenues = array_fill(0, count($steps), 0);
 
+        [$from, $until] = $this->resolveBounds($from, $until);
+
         $events = $this->relevantEventsQuery($trackedPropertyId, $from, $until, $signalSegmentId, $steps)
+            ->limit($this->maxEvents())
             ->get();
 
         $eventsByActor = $events->groupBy(fn (SignalEvent $event): string => $this->actorKey($event));
@@ -493,5 +496,27 @@ final class ConversionFunnelReportService
         }
 
         return round(($numerator / $denominator) * 100, 2);
+    }
+
+    /**
+     * @return array{string|null, string|null}
+     */
+    private function resolveBounds(?string $from, ?string $until): array
+    {
+        if (filled($from) || filled($until)) {
+            return [$from, $until];
+        }
+
+        $windowDays = max(1, (int) config('signals.reporting.funnel.default_window_days', 90));
+
+        return [
+            CarbonImmutable::now()->subDays($windowDays)->toDateString(),
+            CarbonImmutable::now()->toDateString(),
+        ];
+    }
+
+    private function maxEvents(): int
+    {
+        return max(1, (int) config('signals.reporting.funnel.max_events', 25000));
     }
 }

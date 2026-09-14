@@ -124,6 +124,27 @@ The four public collect routes (`identify`, `browser-event`, `pageview`, and `ge
 
 Browser payloads remain lenient at the parsing boundary because they are untrusted and may be sent by older clients. Trusted server-side commerce recorders use strict required-field extraction and throw when a required upstream field is absent, preventing silent zero-value metrics after an upstream contract changes.
 
+The `write_key` must travel in the JSON request body. Keys sent through the query string are rejected on every collect route so credentials never land in access logs.
+
+## Reporting
+
+Funnel and retention reports bound their scan window and row counts:
+
+```php
+'reporting' => [
+    'funnel' => [
+        'default_window_days' => 90,
+        'max_events' => 25000,
+    ],
+    'retention' => [
+        'default_window_days' => 90,
+        'max_identities' => 25000,
+    ],
+],
+```
+
+When no explicit date range is passed, reports default to the trailing `default_window_days`. `max_events` / `max_identities` cap how many rows a single report scans; explicit date ranges are still honored, but the cap always applies.
+
 ## Features
 
 ### User-Agent Parsing
@@ -198,7 +219,7 @@ Geolocation capture is available but reverse geocoding is opt-in. When `async` i
             'cart_id', 'cart_identifier', 'cart_instance', 'cart_total_minor',
             'channel', 'checkout', 'checkout_session_id',
             'commission_minor', 'conversion_id', 'conversion_type',
-            'cookie_value', 'currency', 'external_reference',
+            'currency', 'external_reference',
             'experiment_contexts', 'experiment_id', 'experiment_slug',
             'first_order', 'gateway', 'item_count', 'item_id', 'item_name',
             'items_count', 'landing_url', 'line_total_minor', 'medium',

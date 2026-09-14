@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AIArmada\Signals\Services;
 
 use AIArmada\CommerceSupport\Support\ConnectionDriver;
+use AIArmada\CommerceSupport\Support\LikeSearch;
 use AIArmada\Signals\Models\SignalEvent;
 use Illuminate\Database\Eloquent\Builder;
 use RuntimeException;
@@ -267,17 +268,12 @@ final class SignalCondition
             return self::applyProperty($query, $propertySegments, $operator, $value, $inValues);
         }
 
-        $escapedLikeValue = self::escapeLike($value);
-        $likeOperator = ConnectionDriver::name($query->getConnection()) === 'pgsql'
-            ? 'ILIKE'
-            : 'LIKE';
-
         match ($operator) {
             'equals' => $query->where($field, $value),
             'not_equals' => $query->where($field, '!=', $value),
-            'contains' => $query->where($field, $likeOperator, '%' . $escapedLikeValue . '%'),
-            'starts_with' => $query->where($field, $likeOperator, $escapedLikeValue . '%'),
-            'ends_with' => $query->where($field, $likeOperator, '%' . $escapedLikeValue),
+            'contains' => LikeSearch::whereLike($query, $field, LikeSearch::contains($value)),
+            'starts_with' => LikeSearch::whereLike($query, $field, LikeSearch::startsWith($value)),
+            'ends_with' => LikeSearch::whereLike($query, $field, LikeSearch::endsWith($value)),
             'greater_than' => $query->where($field, '>', $value),
             'greater_than_or_equal' => $query->where($field, '>=', $value),
             'less_than' => $query->where($field, '<', $value),
@@ -295,7 +291,7 @@ final class SignalCondition
      */
     private static function applyProperty(Builder $query, array $propertySegments, string $operator, string $value, array $inValues): bool
     {
-        $escapedLikeValue = self::escapeLike($value);
+        $escapedLikeValue = LikeSearch::escape($value);
         $textExpression = self::jsonTextExpression($query, 'properties', $propertySegments);
         $likeOperator = ConnectionDriver::name($query->getConnection()) === 'pgsql'
             ? 'ILIKE'
@@ -378,10 +374,5 @@ final class SignalCondition
     private static function inValues(string $value): array
     {
         return array_values(array_filter(array_map('trim', explode(',', $value)), static fn (string $item): bool => $item !== ''));
-    }
-
-    private static function escapeLike(string $value): string
-    {
-        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
 }

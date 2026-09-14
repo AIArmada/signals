@@ -19,12 +19,14 @@ Base path is `signals.http.prefix` (default `api/signals`).
   "anonymous_id": "anon-abc",
   "email": "user@example.com",
   "traits": {
-    "plan": "pro"
+    "channel": "web"
   }
 }
 ```
 
-When `auth_tracking` is enabled the currently authenticated Laravel user is automatically linked. You can also pass `auth_user_type` / `auth_user_id` explicitly:
+When `auth_tracking` is enabled the currently authenticated Laravel user is automatically linked. Auth linkage is never accepted from the payload itself.
+
+Traits pass through the same property allowlist and PII blocklist as event properties, so only allowlisted, non-blocked keys are persisted:
 
 ### Page View
 
@@ -87,7 +89,7 @@ Optional device fields can be passed explicitly. When `ua_parsing` is enabled th
 }
 ```
 
-The browser route is deliberately non-financial. It enforces a configurable event allowlist, bounded payload size/depth/key counts, and rate limiting by write key plus client address. Revenue, currency, order/conversion/transaction identifiers, source event IDs, and client-controlled idempotency keys are rejected. `Origin`, `Referer`, and the page URL are domain-policy signals only; they are not authentication.
+The browser route is deliberately non-financial. It enforces a configurable event allowlist, bounded payload size/depth/key counts, and rate limiting by write key plus client address. Revenue, currency, order/conversion/transaction identifiers, and source event IDs are rejected. Retries may pass an optional client `idempotency_key`; repeated submissions with the same key return the original event instead of duplicating it. `Origin`, `Referer`, and the page URL are domain-policy signals only; they are not authentication.
 
 Collect limits live in `signals.ingestion.browser` (full table in `03-configuration.md`): the four public routes (`identify`, `browser-event`, `pageview`, `geo`) share the named `throttle:signals-collect` limiter plus per-IP (`rate_limit_per_minute`, 120) and per-property (`property_rate_limit_per_minute`, 120) checks, payload caps (`max_bytes` 32768, `max_depth` 4, `max_keys` 64), and the `event_allowlist`.
 
@@ -331,8 +333,8 @@ $result = EvaluateAlertRules::run(); // ['processed' => 5, 'skipped' => 1, 'disp
 $result = EvaluateAlertRules::run(trackedPropertyId: $property->id, dryRun: true);
 ```
 
-- **`IngestSignalEvent`** — requires callers to explicitly choose `trusted: true` or `trusted: false`, then handles identity resolution, session stitching, property allowlisting, trusted idempotency via `source_event_id`, and optional on-ingest alert evaluation.
-- **`ResolveSession`** — resolves or creates sessions with device/UA parsing, IP capture (Cloudflare-aware), country detection, and attribution enrichment (UTM/referrer).
+- **`IngestSignalEvent`** — requires callers to explicitly choose `trusted: true` or `trusted: false`, then handles identity resolution, session stitching, property allowlisting, idempotency via `idempotency_key` (`source_event_id` fallback on trusted paths), and optional on-ingest alert evaluation.
+- **`ResolveSession`** — resolves or creates sessions with device/UA parsing, IP capture (Cloudflare-aware behind trusted proxies), country detection, and attribution enrichment (UTM/referrer).
 - **`EvaluateAlertRules`** — iterates active `SignalAlertRule` records through the `SignalAlertEvaluator` and dispatches matched alerts via the `SignalAlertDispatcher`.
 
 ## Aggregation and Alerting

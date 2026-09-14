@@ -9,6 +9,7 @@ use AIArmada\Signals\Models\SignalIdentity;
 use AIArmada\Signals\Models\SignalSession;
 use AIArmada\Signals\Models\TrackedProperty;
 use AIArmada\Signals\Services\SignalUserAgentParser;
+use AIArmada\Signals\Support\DuplicateKeyViolation;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\QueryException;
@@ -109,7 +110,7 @@ final class ResolveSession
 
             return $session;
         } catch (QueryException $e) {
-            if ($e->getCode() !== '23505') {
+            if (! DuplicateKeyViolation::is($e)) {
                 throw $e;
             }
         }
@@ -182,7 +183,7 @@ final class ResolveSession
 
     private function resolveCountryCode(?Request $request, array $payload): ?string
     {
-        if ($request !== null) {
+        if ($request !== null && $request->isFromTrustedProxy()) {
             $cfCountry = $request->header('CF-IPCountry');
             if (
                 $cfCountry !== null
@@ -203,7 +204,7 @@ final class ResolveSession
 
     private function resolveCountrySource(?Request $request, array $payload): ?string
     {
-        if ($request !== null) {
+        if ($request !== null && $request->isFromTrustedProxy()) {
             $cfCountry = $request->header('CF-IPCountry');
             if (
                 $cfCountry !== null
@@ -224,9 +225,11 @@ final class ResolveSession
 
     private function resolveClientIp(Request $request): ?string
     {
-        $cfIp = $request->header('CF-Connecting-IP');
-        if ($cfIp !== null && filter_var($cfIp, FILTER_VALIDATE_IP) !== false) {
-            return $cfIp;
+        if ($request->isFromTrustedProxy()) {
+            $cfIp = $request->header('CF-Connecting-IP');
+            if ($cfIp !== null && filter_var($cfIp, FILTER_VALIDATE_IP) !== false) {
+                return $cfIp;
+            }
         }
 
         return $request->ip();

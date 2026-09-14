@@ -7,8 +7,10 @@ namespace AIArmada\Signals\Actions;
 use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\Signals\Models\SignalIdentity;
 use AIArmada\Signals\Models\TrackedProperty;
+use AIArmada\Signals\Services\SignalPropertyFilter;
 use AIArmada\Signals\Services\SignalsIngestionRequestValidator;
 use Carbon\CarbonImmutable;
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
@@ -20,7 +22,10 @@ final class IdentifySignalIdentity
 {
     use AsAction;
 
-    public function __construct(private readonly SignalsIngestionRequestValidator $requestValidator) {}
+    public function __construct(
+        private readonly SignalsIngestionRequestValidator $requestValidator,
+        private readonly SignalPropertyFilter $propertyFilter,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $payload
@@ -30,9 +35,11 @@ final class IdentifySignalIdentity
         $identity = $this->resolveIdentity($trackedProperty, $payload);
         $seenAt = $this->resolveSeenAt($payload);
 
-        $traits = is_array($payload['traits'] ?? null) ? $payload['traits'] : null;
+        $traits = $this->propertyFilter->filter(
+            is_array($payload['traits'] ?? null) ? $payload['traits'] : null
+        );
 
-        [$authUserType, $authUserId] = $this->resolveAuthUser($payload);
+        [$authUserType, $authUserId] = $this->resolveAuthUser();
 
         $identity->fill([
             'email' => $payload['email'] ?? $identity->email,
@@ -65,8 +72,6 @@ final class IdentifySignalIdentity
             'anonymous_id' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email'],
             'traits' => ['nullable', 'array'],
-            'auth_user_type' => ['nullable', 'string', 'max:255'],
-            'auth_user_id' => ['nullable', 'string', 'max:255'],
             'seen_at' => ['nullable', 'date'],
         ]);
 
@@ -127,7 +132,15 @@ final class IdentifySignalIdentity
     {
         $seenAt = $payload['seen_at'] ?? null;
 
-        return is_string($seenAt) ? CarbonImmutable::parse($seenAt) : CarbonImmutable::now();
+        if (! is_string($seenAt) || $seenAt === '') {
+            return CarbonImmutable::now();
+        }
+
+        try {
+            return CarbonImmutable::parse($seenAt);
+        } catch (InvalidFormatException) {
+            return CarbonImmutable::now();
+        }
     }
 
     private function syncOwnerFromProperty(SignalIdentity $identity, TrackedProperty $trackedProperty): void
@@ -141,19 +154,13 @@ final class IdentifySignalIdentity
     }
 
     /**
-     * Resolve auth user type and ID from the payload or — when auth_tracking is
-     * enabled — from the currently authenticated Laravel user.
+     * Resolve auth user type and ID from the currently authenticated Laravel
+     * user when auth_tracking is enabled. Payload values are never trusted.
      *
-     * @param  array<string, mixed>  $payload
      * @return array{string|null, string|null}
      */
-    private function resolveAuthUser(array $payload): array
+    private function resolveAuthUser(): array
     {
-        // Explicit payload values take priority
-        if (($payload['auth_user_type'] ?? null) !== null && ($payload['auth_user_id'] ?? null) !== null) {
-            return [(string) $payload['auth_user_type'], (string) $payload['auth_user_id']];
-        }
-
         if (! config('signals.features.auth_tracking.enabled', false)) {
             return [null, null];
         }
