@@ -52,9 +52,6 @@ final class TrackedProperty extends Model implements Auditable
 
     protected static string $ownerScopeConfigKey = 'signals.owner';
 
-    /** @var array<string, bool> */
-    private static array $tableExistsCache = [];
-
     /** @var list<string> */
     protected $hidden = [
         'owner_scope',
@@ -194,9 +191,10 @@ final class TrackedProperty extends Model implements Auditable
                 $growthExperiment = new $growthExperimentModel;
                 $growthTable = $growthExperiment->getTable();
 
-                self::$tableExistsCache[$growthTable] ??= Schema::hasTable($growthTable);
-
-                if (self::$tableExistsCache[$growthTable]) {
+                // Checked live on every delete: the answer depends on the
+                // current connection's schema, which a process-wide static
+                // cache cannot track across rebuilds or tenant switches.
+                if (Schema::hasTable($growthTable)) {
                     $growthExperimentModel::query()
                         ->withoutOwnerScope()
                         ->where('tracked_property_id', $trackedProperty->getKey())
