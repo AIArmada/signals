@@ -296,13 +296,14 @@ final class SignalCondition
         $likeOperator = ConnectionDriver::name($query->getConnection()) === 'pgsql'
             ? 'ILIKE'
             : 'LIKE';
+        $escapeClause = LikeSearch::escapeClause($query);
 
         match ($operator) {
             'equals' => $query->whereRaw("{$textExpression} = ?", [$value]),
             'not_equals' => $query->whereRaw("{$textExpression} IS NOT NULL")->whereRaw("{$textExpression} <> ?", [$value]),
-            'contains' => $query->whereRaw("{$textExpression} {$likeOperator} ? ESCAPE '\\'", ['%' . $escapedLikeValue . '%']),
-            'starts_with' => $query->whereRaw("{$textExpression} {$likeOperator} ? ESCAPE '\\'", [$escapedLikeValue . '%']),
-            'ends_with' => $query->whereRaw("{$textExpression} {$likeOperator} ? ESCAPE '\\'", ['%' . $escapedLikeValue]),
+            'contains' => $query->whereRaw("{$textExpression} {$likeOperator} ? {$escapeClause}", ['%' . $escapedLikeValue . '%']),
+            'starts_with' => $query->whereRaw("{$textExpression} {$likeOperator} ? {$escapeClause}", [$escapedLikeValue . '%']),
+            'ends_with' => $query->whereRaw("{$textExpression} {$likeOperator} ? {$escapeClause}", ['%' . $escapedLikeValue]),
             'greater_than' => self::applyNumericProperty($query, $propertySegments, '>', $value),
             'greater_than_or_equal' => self::applyNumericProperty($query, $propertySegments, '>=', $value),
             'less_than' => self::applyNumericProperty($query, $propertySegments, '<', $value),

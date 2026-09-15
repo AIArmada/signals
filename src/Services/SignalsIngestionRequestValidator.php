@@ -119,7 +119,7 @@ final class SignalsIngestionRequestValidator
 
         $content = $request->getContent();
 
-        if (is_string($content) && mb_strlen($content) > $maxBytes) {
+        if (is_string($content) && mb_strlen($content, '8bit') > $maxBytes) {
             throw ValidationException::withMessages([
                 'payload' => "The {$boundary} Signals payload exceeds {$maxBytes} bytes.",
             ]);
@@ -159,13 +159,13 @@ final class SignalsIngestionRequestValidator
                 ]);
             }
 
-            if (is_string($key) && mb_strlen($key) > $maxStringBytes) {
+            if (is_string($key) && mb_strlen($key, '8bit') > $maxStringBytes) {
                 throw ValidationException::withMessages([
                     'payload' => "A Signals payload key exceeds {$maxStringBytes} bytes.",
                 ]);
             }
 
-            if (is_string($value) && mb_strlen($value) > $maxStringBytes) {
+            if (is_string($value) && mb_strlen($value, '8bit') > $maxStringBytes) {
                 throw ValidationException::withMessages([
                     'payload' => "A Signals payload value exceeds {$maxStringBytes} bytes.",
                 ]);
