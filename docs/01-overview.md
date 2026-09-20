@@ -74,6 +74,7 @@ The package registers listeners only when related packages/events exist:
 - Orders: paid
 - Vouchers: applied, removed
 - Affiliates: attributed, conversion recorded
+- Links: clicked (`link.clicked` engagement events with slug, destination host, UTM, and bot flags)
 
 When browser integration is enabled, Signals can also auto-create a browser tracked property per owner/global context and inject tracker markup into successful HTML responses.
 

@@ -11,6 +11,7 @@ use AIArmada\Signals\Services\Recorders\AffiliateSignalRecorder;
 use AIArmada\Signals\Services\Recorders\CartSignalRecorder;
 use AIArmada\Signals\Services\Recorders\CheckoutSignalRecorder;
 use AIArmada\Signals\Services\Recorders\FilamentCartSignalRecorder;
+use AIArmada\Signals\Services\Recorders\LinkSignalRecorder;
 use AIArmada\Signals\Services\Recorders\OrderSignalRecorder;
 use AIArmada\Signals\Services\Recorders\SignalRecorderSupport;
 use AIArmada\Signals\Services\Recorders\VoucherSignalRecorder;
@@ -39,6 +40,8 @@ final class CommerceSignalsRecorder
 
     private readonly AffiliateNetworkSignalRecorder $affiliateNetwork;
 
+    private readonly LinkSignalRecorder $links;
+
     private readonly SignalRecorderSupport $support;
 
     public function __construct(TrackedPropertyResolver $trackedPropertyResolver, IngestSignalEvent $ingestSignalEvent)
@@ -51,6 +54,7 @@ final class CommerceSignalsRecorder
         $this->vouchers = new VoucherSignalRecorder($this->support);
         $this->affiliates = new AffiliateSignalRecorder($this->support);
         $this->affiliateNetwork = new AffiliateNetworkSignalRecorder($this->support);
+        $this->links = new LinkSignalRecorder($this->support);
     }
 
     public function recordCheckoutCompleted(Model $session): ?SignalEvent
@@ -163,6 +167,11 @@ final class CommerceSignalsRecorder
     public function recordNetworkConversionRecorded(object $link, int $revenueMinor = 0): ?SignalEvent
     {
         return $this->affiliateNetwork->recordNetworkConversion($link, $revenueMinor);
+    }
+
+    public function recordLinkClicked(Model $link, Model $click): ?SignalEvent
+    {
+        return $this->links->recordClicked($link, $click);
     }
 
     /**

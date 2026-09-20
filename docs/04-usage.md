@@ -297,11 +297,12 @@ $recorder->recordOrderPaid($order);
 $recorder->recordCheckoutCompleted($checkout);
 $recorder->recordAffiliateAttributed($attribution);
 $recorder->recordAffiliateConversionRecorded($conversion);
+$recorder->recordLinkClicked($link, $click);
 ```
 
 The `signals.recording.events.*` toggles let you disable selected built-in recorder outputs without removing the surrounding integration.
 
-Field mapping lives in per-source recorders (`AIArmada\Signals\Services\Recorders\CartSignalRecorder`, `CheckoutSignalRecorder`, `OrderSignalRecorder`, `FilamentCartSignalRecorder`, `VoucherSignalRecorder`, `AffiliateSignalRecorder`, `AffiliateNetworkSignalRecorder`); `CommerceSignalsRecorder` stays the stable dispatcher. Trusted paths fail loud — `SignalRecorderSupport::requiredModelInt()` and friends throw `InvalidArgumentException` on missing fields. Browser ingestion stays lenient: `IngestSignalEvent` (`trusted: false`) defaults missing fields and forces `revenue_minor` to `0`.
+Field mapping lives in per-source recorders (`AIArmada\Signals\Services\Recorders\CartSignalRecorder`, `CheckoutSignalRecorder`, `OrderSignalRecorder`, `FilamentCartSignalRecorder`, `VoucherSignalRecorder`, `AffiliateSignalRecorder`, `AffiliateNetworkSignalRecorder`, `LinkSignalRecorder`); `CommerceSignalsRecorder` stays the stable dispatcher. Trusted paths fail loud — `SignalRecorderSupport::requiredModelInt()` and friends throw `InvalidArgumentException` on missing fields. Browser ingestion stays lenient: `IngestSignalEvent` (`trusted: false`) defaults missing fields and forces `revenue_minor` to `0`.
 
 ## Actions
 

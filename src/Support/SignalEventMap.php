@@ -115,6 +115,13 @@ final class SignalEventMap
                     ['property' => 'voucher', 'type' => 'object'],
                 ],
             ],
+            'AIArmada\\Links\\Events\\LinkClicked' => [
+                'method' => 'recordLinkClicked',
+                'arguments' => [
+                    ['property' => 'link', 'type' => 'model'],
+                    ['property' => 'click', 'type' => 'model'],
+                ],
+            ],
         ][$eventClass] ?? null;
     }
 }

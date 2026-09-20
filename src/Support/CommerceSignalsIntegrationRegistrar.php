@@ -18,6 +18,7 @@ final class CommerceSignalsIntegrationRegistrar
         $this->bootCheckoutIntegration();
         $this->bootOrdersIntegration();
         $this->bootVoucherIntegration();
+        $this->bootLinksIntegration();
     }
 
     private function bootAffiliatesIntegration(): void
@@ -154,6 +155,17 @@ final class CommerceSignalsIntegrationRegistrar
 
         if (config('signals.integrations.affiliate_network.listen_for_network_conversion_recorded', true)) {
             $this->listenIfAvailable('AIArmada\\AffiliateNetwork\\Events\\NetworkConversionRecorded');
+        }
+    }
+
+    private function bootLinksIntegration(): void
+    {
+        if (! config('signals.integrations.links.enabled', true)) {
+            return;
+        }
+
+        if (config('signals.integrations.links.listen_for_clicked', true)) {
+            $this->listenIfAvailable('AIArmada\\Links\\Events\\LinkClicked');
         }
     }
 

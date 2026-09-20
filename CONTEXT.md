@@ -19,7 +19,7 @@ keywords:
 - Role: Privacy-first behavioural analytics: ingestion, sessions, rollups, goals, alerts, reports.
 - Triggers: analytics, event-tracking, funnel, session, alert
 - Search first: `src/Models, src/Actions, src/Services, config, docs`
-- Related: `filament-signals`, `growth`, `cart`, `checkout`, `orders`, `affiliates`
+- Related: `filament-signals`, `growth`, `cart`, `checkout`, `orders`, `affiliates`, `links`
 - Paired: `filament-signals` (Filament admin adapter)
 
 ## Read next

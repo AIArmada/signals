@@ -284,6 +284,17 @@ return [
             'listen_for_application_approved' => true,
             'listen_for_network_conversion_recorded' => true,
         ],
+        'links' => [
+            'enabled' => true,
+            'listen_for_clicked' => true,
+            'clicked_event_name' => 'link.clicked',
+            'event_category' => 'engagement',
+            'tracked_property' => [
+                'auto_create' => true,
+                'slug' => 'commerce-links',
+                'name' => 'Commerce Links',
+            ],
+        ],
     ],
 
     /* Reporting bounds and row caps */
