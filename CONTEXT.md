@@ -41,7 +41,7 @@ keywords:
 - Owner/security: Owner-scoped + CrossTenantQuery.
 
 ## Key surfaces
-- Models: `SavedSignalReport`, `SignalAlertDelivery`, `SignalAlertLog`, `SignalAlertRule`, `SignalDailyMetric`, `SignalEvent`, `SignalGoal`, `SignalIdentity`, `SignalInteractionRule`, `SignalSegment`
+- Models: `SavedSignalReport`, `SignalAlertDelivery`, `SignalAlertLog`, `SignalAlertRule`, `SignalDailyMetric`, `SignalEvent`, `SignalGoal`, `SignalIdentity`, `SignalInteractionRule`, `SignalSegment`, `SignalSession`, `TrackedProperty`
 - Actions/Services: `Actions/CaptureSignalGeolocation`, `Actions/CaptureSignalPageView`, `Actions/EvaluateAlertRules`, `Actions/IdentifySignalIdentity`, `Actions/IngestSignalEvent`, `Actions/IngestTrustedSignalOutcome`, `Actions/MarkAllSignalAlertsAsRead`, `Actions/MarkSignalAlertAsRead`
 - Config `signals.php`: `database`, `table_prefix`, `json_column_type`, `tables`, `tracked_properties`, `identities`, `sessions`, `events`, `interaction_rules`, `daily_metrics`
 
