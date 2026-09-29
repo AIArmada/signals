@@ -31,7 +31,7 @@ The `aiarmada/signals` package is the analytics foundation for Commerce. It owns
 ## Main models services or surfaces
 
 - **Actions** — `IngestSignalEvent`, `ResolveSession`, `EvaluateAlertRules`, `IdentifySignalIdentity`, `CaptureSignalPageView`, `CaptureSignalGeolocation`, `ServeSignalsTracker`, and alert-read actions
-- **Contracts** — `BrowserContextResolverInterface`, `ReportInterface`, `ReverseGeocoderContract`, `SignalLocationResolverContract`
+- **Contracts** — `BrowserContextResolverInterface`, `ReportInterface`, `ReverseGeocoderContract`, `SignalEventIngestor`, `SignalLocationResolverContract`
 - **Ingestion surface** — HTTP actions for identity, page-view, custom-event capture, geolocation capture, and tracker-script delivery
 - **Browser surface** — browser-context cookies, optional automatic tracker injection, and Blade `@signalsTracker` rendering
 - **Models and services** — signals domain models, report services (`PageViewReportService`, `SignalsDashboardService`, funnel/acquisition/journey/retention/content/goals/live/devices), alerting, ingestion helpers, route catalogs, and daily aggregation
@@ -63,7 +63,7 @@ The `aiarmada/signals` package is the analytics foundation for commerce packages
 - Owner-aware multi-tenancy via `commerce-support`
 - Automatic integration listeners for cart, checkout, orders, vouchers, and affiliates
 
-Reverse geocoding uses a pipeline-based resolver. When enabled out of the box, the package registers the built-in Nominatim geocoder and will also honor any app-bound custom location resolver.
+Reverse geocoding uses a pipeline-based resolver. The built-in Nominatim geocoder is always registered on the pipeline, and any app-bound custom location resolver is added alongside it — but resolution only runs when `features.geolocation.reverse_geocode.enabled` is `true`, which is opt-in (`false` by default).
 
 ## Integrations
 
