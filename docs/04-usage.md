@@ -97,7 +97,7 @@ Collect limits live in `signals.ingestion.browser` (full table in `03-configurat
 
 `POST /api/signals/collect/server-outcome`
 
-Server outcomes require `X-Signals-Timestamp` and `X-Signals-Signature` headers. The signature is lowercase hexadecimal HMAC-SHA256 over `{timestamp}.{raw-json-body}` using `SIGNALS_INGESTION_SECRET` (the env var behind `signals.ingestion.trusted.secret`). Prefixing the signature with `sha256=` is supported. Timestamps outside the configured replay window and repeated signatures are rejected.
+Server outcomes require `X-Signals-Timestamp` and `X-Signals-Signature` headers. The signature is lowercase hexadecimal HMAC-SHA256 over `{timestamp}.{raw-json-body}` using `SIGNALS_INGESTION_SECRET`. Prefixing the signature with `sha256=` is supported. Timestamps outside the configured replay window and repeated signatures are rejected.
 
 ```json
 {
@@ -335,7 +335,7 @@ $result = EvaluateAlertRules::run(trackedPropertyId: $property->id, dryRun: true
 ```
 
 - **`IngestSignalEvent`** — requires callers to explicitly choose `trusted: true` or `trusted: false`, then handles identity resolution, session stitching, property allowlisting, idempotency via `idempotency_key` (`source_event_id` fallback on trusted paths), and optional on-ingest alert evaluation.
-- **`ResolveSession`** — resolves or creates sessions with device/UA parsing, IP capture (Cloudflare-aware behind trusted proxies), country detection, and attribution enrichment (UTM/referrer). It has no `AsAction` trait, so call it through the container with `handle()` rather than `::run()`.
+- **`ResolveSession`** — a container-resolved service (not a runnable action): resolves or creates sessions with device/UA parsing, IP capture (Cloudflare-aware behind trusted proxies), country detection, and attribution enrichment (UTM/referrer).
 - **`EvaluateAlertRules`** — iterates active `SignalAlertRule` records through the `SignalAlertEvaluator` and dispatches matched alerts via the `SignalAlertDispatcher`.
 
 ## Aggregation and Alerting

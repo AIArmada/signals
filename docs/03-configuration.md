@@ -11,7 +11,6 @@ Signals configuration lives in `config/signals.php`.
 ```php
 'database' => [
     'table_prefix' => 'signal_',
-    'json_column_type' => env('SIGNALS_JSON_COLUMN_TYPE', 'jsonb'),
     'tables' => [
         'tracked_properties' => 'signal_tracked_properties',
         'identities'         => 'signal_identities',
@@ -24,11 +23,12 @@ Signals configuration lives in `config/signals.php`.
         'saved_reports'      => 'signal_saved_reports',
         'alert_rules'        => 'signal_alert_rules',
         'alert_logs'         => 'signal_alert_logs',
+        'alert_deliveries'   => 'signal_alert_deliveries',
     ],
 ],
 ```
 
-Table names can be overridden individually in `database.tables`. All tables default to the `signal_` prefix. Migrations resolve the JSON column type through `commerce_json_column_type('signals', 'jsonb')`, which prefers `SIGNALS_JSON_COLUMN_TYPE`, then the shared `COMMERCE_JSON_COLUMN_TYPE`, then this config value.
+Table names can be overridden individually in `database.tables`. All tables default to the `signal_` prefix.
 
 ## Defaults
 
@@ -148,51 +148,51 @@ When no explicit date range is passed, reports default to the trailing `default_
 
 ## Features
 
-`config/signals.php` has a single `features` array. Each snippet below shows **one
-sub-array of it** — they are not standalone `features` blocks, and replacing the whole array
-with one of them would drop the sibling keys.
-
 ### User-Agent Parsing
 
 ```php
-// inside features
-'ua_parsing' => [
-    'enabled'   => true,
-    'store_raw' => true, // store raw User-Agent string on signal_sessions
+'features' => [
+    'ua_parsing' => [
+        'enabled'   => true,
+        'store_raw' => true, // store raw User-Agent string on signal_sessions
+    ],
 ],
 ```
 
 ### IP Tracking
 
 ```php
-// inside features
-'ip_tracking' => [
-    'enabled'   => true,
-    'anonymize' => false, // true = zero-out last octet (IPv4) / last 80 bits (IPv6)
+'features' => [
+    'ip_tracking' => [
+        'enabled'   => true,
+        'anonymize' => false, // true = zero-out last octet (IPv4) / last 80 bits (IPv6)
+    ],
 ],
 ```
 
 ### Auth Tracking
 
 ```php
-// inside features
-'auth_tracking' => [
-    'enabled' => false, // opt-in: links auth()->user() to SignalIdentity on identify
+'features' => [
+    'auth_tracking' => [
+        'enabled' => false, // opt-in: links auth()->user() to SignalIdentity on identify
+    ],
 ],
 ```
 
-When enabled, the currently authenticated Laravel user is automatically linked during identity capture. You can also pass `auth_user_type` / `auth_user_id` explicitly in the identify payload.
+When enabled, the currently authenticated Laravel user is automatically linked during identity capture. Auth linkage is never accepted from the payload itself.
 
 ### Geolocation
 
 ```php
-// inside features
-'geolocation' => [
-    'enabled' => true, // allow browser coordinate capture via /collect/geo
-    'reverse_geocode' => [
-        'enabled'           => false, // opt-in: resolve coordinates to address fields
-        'async'             => true,  // dispatch ReverseGeocodeSessionJob instead of inline
-        'store_raw_payload' => false, // persist raw provider response on the session
+'features' => [
+    'geolocation' => [
+        'enabled' => true, // allow browser coordinate capture via /collect/geo
+        'reverse_geocode' => [
+            'enabled'           => false, // opt-in: resolve coordinates to address fields
+            'async'             => true,  // dispatch ReverseGeocodeSessionJob instead of inline
+            'store_raw_payload' => false, // persist raw provider response on the session
+        ],
     ],
 ],
 ```
@@ -202,37 +202,39 @@ Geolocation capture is available but reverse geocoding is opt-in. When `async` i
 ### Monetary
 
 ```php
-// inside features
-'monetary' => [
-    'enabled' => true, // false = hide all revenue UI: stat cards, columns, goal types, alert metrics
+'features' => [
+    'monetary' => [
+        'enabled' => true, // false = hide all revenue UI: stat cards, columns, goal types, alert metrics
+    ],
 ],
 ```
 
 ### Privacy — Property Allowlist
 
 ```php
-// inside features
-'privacy' => [
-    'property_allowlist' => [
-        'affiliate_code', 'affiliate_id', 'attribution_id',
-        'assignment_id',
-        'cart_id', 'cart_identifier', 'cart_instance', 'cart_total_minor',
-        'channel', 'checkout', 'checkout_session_id',
-        'commission_minor', 'conversion_id', 'conversion_type',
-        'currency', 'external_reference',
-        'experiment_contexts', 'experiment_id', 'experiment_slug',
-        'first_order', 'gateway', 'item_count', 'item_id', 'item_name',
-        'items_count', 'landing_url', 'line_total_minor', 'medium',
-        'module_type',
-        'order_id', 'order_number', 'order_reference',
-        'payment_gateway', 'quantity', 'referrer_url',
-        'refund_reason',
-        'shipping_method', 'source_event_id', 'status',
-        'subtotal_minor', 'subject_key', 'subject_instance',
-        'title', 'total_minor', 'total_quantity', 'transaction_id',
-        'unique_item_count', 'unit_price_minor', 'value_minor',
-        'variant_code', 'variant_id',
-        'voucher_code', 'voucher_id', 'voucher_name', 'voucher_type', 'voucher_value',
+'features' => [
+    'privacy' => [
+        'property_allowlist' => [
+            'affiliate_code', 'affiliate_id', 'attribution_id',
+            'assignment_id',
+            'cart_id', 'cart_identifier', 'cart_instance', 'cart_total_minor',
+            'channel', 'checkout', 'checkout_session_id',
+            'commission_minor', 'conversion_id', 'conversion_type',
+            'currency', 'external_reference',
+            'experiment_contexts', 'experiment_id', 'experiment_slug',
+            'first_order', 'gateway', 'item_count', 'item_id', 'item_name',
+            'items_count', 'landing_url', 'line_total_minor', 'medium',
+            'module_type',
+            'order_id', 'order_number', 'order_reference',
+            'payment_gateway', 'quantity', 'referrer_url',
+            'refund_reason',
+            'shipping_method', 'source_event_id', 'status',
+            'subtotal_minor', 'subject_key', 'subject_instance',
+            'title', 'total_minor', 'total_quantity', 'transaction_id',
+            'unique_item_count', 'unit_price_minor', 'value_minor',
+            'variant_code', 'variant_id',
+            'voucher_code', 'voucher_id', 'voucher_name', 'voucher_type', 'voucher_value',
+        ],
     ],
 ],
 ```
@@ -244,18 +246,19 @@ The default allowlist now includes Growth attribution keys such as `experiment_i
 ### Alerts
 
 ```php
-// inside features
-'alerts' => [
-    'evaluate_on_ingest' => [
-        'enabled' => false,
-        'queue'   => true,
-    ],
-    'allow_inline_destinations' => false,
-    'default_channels'          => ['database'],
-    'destinations' => [
-        'email'   => [],
-        'webhook' => [],
-        'slack'   => [],
+'features' => [
+    'alerts' => [
+        'evaluate_on_ingest' => [
+            'enabled' => false,
+            'queue'   => true,
+        ],
+        'allow_inline_destinations' => false,
+        'default_channels'          => ['database'],
+        'destinations' => [
+            'email'   => [],
+            'webhook' => [],
+            'slack'   => [],
+        ],
     ],
 ],
 ```
@@ -266,42 +269,43 @@ Webhook and Slack destinations must be public `http` or `https` URLs on standard
 
 ## Integrations
 
-Each integration is independently toggled. `browser`, `cart`, and `filament_cart` default to `enabled: false`; `checkout`, `orders`, `vouchers`, `affiliates`, `affiliate_network`, and `links` default to `enabled: true`. As with `features`, each snippet below is one sub-array of the single `integrations` array.
+Each integration is independently toggled. Browser and cart integrations default to `enabled: false`; checkout, orders, vouchers, and affiliates default to `enabled: true`.
 
 ### Browser
 
 ```php
-// inside integrations
-'browser' => [
-    'enabled' => false,
-    'auto_register_middleware' => true,
-    'middleware_group' => 'web',
-    'auto_inject' => true,
-    'interaction_tracking' => [
-        'enabled' => true,
-        'include_rules_without_selector' => false,
-    ],
-    'identifiers' => [
-        'visitor_cookie_name' => 'sig_vid',
-        'session_cookie_name' => 'sig_sid',
-        'visitor_cookie_ttl_seconds' => 31_536_000,
-        'session_cookie_ttl_seconds' => 1_800,
-        'path' => '/',
-        'domain' => null,
-        'secure' => null,
-        'http_only' => true,
-        'same_site' => 'lax',
-    ],
-    'tracked_property' => [
-        'auto_create' => true,
-        'slug' => 'commerce-browser',
-        'name' => 'Commerce Browser',
-    ],
-    'identify' => [
-        'enabled' => true,
-    ],
-    'geolocation' => [
-        'enabled' => true,
+'integrations' => [
+    'browser' => [
+        'enabled' => false,
+        'auto_register_middleware' => true,
+        'middleware_group' => 'web',
+        'auto_inject' => true,
+        'interaction_tracking' => [
+            'enabled' => true,
+            'include_rules_without_selector' => false,
+        ],
+        'identifiers' => [
+            'visitor_cookie_name' => 'sig_vid',
+            'session_cookie_name' => 'sig_sid',
+            'visitor_cookie_ttl_seconds' => 31_536_000,
+            'session_cookie_ttl_seconds' => 1_800,
+            'path' => '/',
+            'domain' => null,
+            'secure' => null,
+            'http_only' => true,
+            'same_site' => 'lax',
+        ],
+        'tracked_property' => [
+            'auto_create' => true,
+            'slug' => 'commerce-browser',
+            'name' => 'Commerce Browser',
+        ],
+        'identify' => [
+            'enabled' => true,
+        ],
+        'geolocation' => [
+            'enabled' => true,
+        ],
     ],
 ],
 ```
@@ -318,20 +322,21 @@ Browser integration controls:
 ### Cart
 
 ```php
-// inside integrations
-'cart' => [
-    'enabled'                  => false,
-    'listen_for_item_added'    => true,
-    'listen_for_item_removed'  => true,
-    'listen_for_cleared'       => true,
-    'item_added_event_name'    => 'cart.item.added',
-    'item_removed_event_name'  => 'cart.item.removed',
-    'cleared_event_name'       => 'cart.cleared',
-    'event_category'           => 'cart',
-    'tracked_property' => [
-        'auto_create' => true,
-        'slug'        => 'commerce-cart',
-        'name'        => 'Commerce Cart',
+'integrations' => [
+    'cart' => [
+        'enabled'                  => false,
+        'listen_for_item_added'    => true,
+        'listen_for_item_removed'  => true,
+        'listen_for_cleared'       => true,
+        'item_added_event_name'    => 'cart.item.added',
+        'item_removed_event_name'  => 'cart.item.removed',
+        'cleared_event_name'       => 'cart.cleared',
+        'event_category'           => 'cart',
+        'tracked_property' => [
+            'auto_create' => true,
+            'slug'        => 'commerce-cart',
+            'name'        => 'Commerce Cart',
+        ],
     ],
 ],
 ```
@@ -339,22 +344,23 @@ Browser integration controls:
 ### Filament Cart
 
 ```php
-// inside integrations
-'filament_cart' => [
-    'enabled'                          => false,
-    'listen_for_snapshot_synced'       => true,
-    'listen_for_checkout_started'      => true,
-    'listen_for_abandoned'             => true,
-    'listen_for_high_value_detected'   => true,
-    'snapshot_synced_event_name'       => 'cart.snapshot.synced',
-    'checkout_started_event_name'      => 'cart.checkout.started',
-    'abandoned_event_name'             => 'cart.abandoned',
-    'high_value_detected_event_name'   => 'cart.high_value.detected',
-    'event_category'                   => 'cart',
-    'tracked_property' => [
-        'auto_create' => true,
-        'slug'        => 'commerce-cart',
-        'name'        => 'Commerce Cart',
+'integrations' => [
+    'filament_cart' => [
+        'enabled'                          => false,
+        'listen_for_snapshot_synced'       => true,
+        'listen_for_checkout_started'      => true,
+        'listen_for_abandoned'             => true,
+        'listen_for_high_value_detected'   => true,
+        'snapshot_synced_event_name'       => 'cart.snapshot.synced',
+        'checkout_started_event_name'      => 'cart.checkout.started',
+        'abandoned_event_name'             => 'cart.abandoned',
+        'high_value_detected_event_name'   => 'cart.high_value.detected',
+        'event_category'                   => 'cart',
+        'tracked_property' => [
+            'auto_create' => true,
+            'slug'        => 'commerce-cart',
+            'name'        => 'Commerce Cart',
+        ],
     ],
 ],
 ```
@@ -362,58 +368,62 @@ Browser integration controls:
 ### Checkout
 
 ```php
-// inside integrations
-'checkout' => [
-    'enabled'               => true,
-    'listen_for_started'    => true,
-    'listen_for_completed'  => true,
-    'started_event_name'    => 'checkout.started',
-    'event_name'            => 'checkout.completed',
-    'event_category'        => 'checkout',
+'integrations' => [
+    'checkout' => [
+        'enabled'               => true,
+        'listen_for_started'    => true,
+        'listen_for_completed'  => true,
+        'started_event_name'    => 'checkout.started',
+        'event_name'            => 'checkout.completed',
+        'event_category'        => 'checkout',
+    ],
 ],
 ```
 
 ### Orders
 
 ```php
-// inside integrations
-'orders' => [
-    'enabled'          => true,
-    'listen_for_paid'  => true,
-    'listen_for_refunded' => true,
-    'event_name'       => 'order.paid',
-    'event_category'   => 'conversion',
-    'refund_event_name' => 'order.refunded',
-    'refund_event_category' => 'conversion',
+'integrations' => [
+    'orders' => [
+        'enabled'          => true,
+        'listen_for_paid'  => true,
+        'listen_for_refunded' => true,
+        'event_name'       => 'order.paid',
+        'event_category'   => 'conversion',
+        'refund_event_name' => 'order.refunded',
+        'refund_event_category' => 'conversion',
+    ],
 ],
 ```
 
 ### Vouchers
 
 ```php
-// inside integrations
-'vouchers' => [
-    'enabled'               => true,
-    'listen_for_applied'    => true,
-    'listen_for_removed'    => true,
-    'applied_event_name'    => 'voucher.applied',
-    'removed_event_name'    => 'voucher.removed',
-    'event_category'        => 'promotion',
+'integrations' => [
+    'vouchers' => [
+        'enabled'               => true,
+        'listen_for_applied'    => true,
+        'listen_for_removed'    => true,
+        'applied_event_name'    => 'voucher.applied',
+        'removed_event_name'    => 'voucher.removed',
+        'event_category'        => 'promotion',
+    ],
 ],
 ```
 
 ### Affiliates
 
 ```php
-// inside integrations
-'affiliates' => [
-    'enabled'                        => true,
-    'listen_for_attributed'          => true,
-    'listen_for_conversion_recorded' => true,
-    'attributed_event_name'          => 'affiliate.attributed',
-    'attributed_event_category'      => 'acquisition',
-    'conversion_event_name'          => 'affiliate.conversion.recorded',
-    'conversion_event_category'      => 'conversion',
+'integrations' => [
+    'affiliates' => [
+        'enabled'                        => true,
+        'listen_for_attributed'          => true,
+        'listen_for_conversion_recorded' => true,
+        'attributed_event_name'          => 'affiliate.attributed',
+        'attributed_event_category'      => 'acquisition',
+        'conversion_event_name'          => 'affiliate.conversion.recorded',
+        'conversion_event_category'      => 'conversion',
+    ],
 ],
 ```
 

@@ -21,6 +21,7 @@ return [
             'saved_reports' => $tablePrefix . 'saved_reports',
             'alert_rules' => $tablePrefix . 'alert_rules',
             'alert_logs' => $tablePrefix . 'alert_logs',
+            'alert_deliveries' => $tablePrefix . 'alert_deliveries',
         ],
     ],
 

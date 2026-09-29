@@ -35,7 +35,6 @@ These services all operate on the same owner-scoped Signals data and can be reus
 ```php
 use AIArmada\Signals\Services\SignalRouteCatalog;
 
-// Returns null for unknown or ineligible routes.
 $condition = app(SignalRouteCatalog::class)->conditionForRouteName('pricing.show');
 
 // ['field' => 'path', 'operator' => 'equals', 'value' => '/pricing']
@@ -76,7 +75,7 @@ Named destinations from config are preferred. Inline destinations are ignored un
 ## Evaluation strategy
 
 - scheduled evaluation via `signals:process-alerts` is the baseline
-- on-ingest evaluation can also be enabled through `signals.features.alerts.evaluate_on_ingest.enabled` (with `signals.features.alerts.evaluate_on_ingest.queue` controlling whether evaluation is queued)
+- on-ingest evaluation can also be enabled through `signals.features.alerts.evaluate_on_ingest`
 - queued evaluation is recommended when alerts or geocoding could slow down ingest requests
 
 ## Idempotency
