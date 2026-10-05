@@ -17,6 +17,7 @@ final class CheckoutSignalRecorder
             session: $session,
             eventName: (string) config('signals.integrations.checkout.started_event_name', 'checkout.started'),
             eventKey: 'checkout.started',
+            transition: 'started',
             occurredAttributes: ['created_at', 'updated_at'],
             properties: [
                 'payment_gateway' => $this->support->stringValue($this->support->modelAttribute($session, 'selected_payment_gateway')),
@@ -31,6 +32,7 @@ final class CheckoutSignalRecorder
             session: $session,
             eventName: (string) config('signals.integrations.checkout.event_name', 'checkout.completed'),
             eventKey: 'checkout.completed',
+            transition: 'completed',
             occurredAttributes: ['completed_at', 'updated_at'],
             properties: [
                 'payment_gateway' => $this->support->stringValue($this->support->modelAttribute($session, 'selected_payment_gateway')),
@@ -42,7 +44,7 @@ final class CheckoutSignalRecorder
      * @param  list<string>  $occurredAttributes
      * @param  array<string, mixed>  $properties
      */
-    private function record(Model $session, string $eventName, string $eventKey, array $occurredAttributes, array $properties): ?SignalEvent
+    private function record(Model $session, string $eventName, string $eventKey, string $transition, array $occurredAttributes, array $properties): ?SignalEvent
     {
         if (! $this->support->isEventRecordingEnabled($eventKey)) {
             return null;
@@ -54,6 +56,7 @@ final class CheckoutSignalRecorder
             return null;
         }
 
+        $sessionKey = (string) $session->getKey();
         $cartId = $this->support->stringValue($this->support->modelAttribute($session, 'cart_id'));
         $anonymousId = $this->growthVisitorId($session) ?? $cartId;
         $properties = array_merge([
@@ -61,6 +64,7 @@ final class CheckoutSignalRecorder
             'cart_id' => $cartId,
             'order_id' => $this->support->stringValue($this->support->modelAttribute($session, 'order_id')),
             'growth_visitor_id' => $anonymousId,
+            'total_minor' => $this->support->requiredModelInt($session, 'grand_total'),
         ], $properties);
 
         return $this->support->ingest($trackedProperty, [
@@ -69,7 +73,9 @@ final class CheckoutSignalRecorder
             'external_id' => $this->support->stringValue($this->support->modelAttribute($session, 'customer_id')),
             'anonymous_id' => $anonymousId,
             'occurred_at' => $this->support->requiredModelTimestamp($session, $occurredAttributes),
-            'revenue_minor' => $this->support->requiredModelInt($session, 'grand_total'),
+            'idempotency_key' => 'checkout:' . $sessionKey . ':' . $transition,
+            'source_event_id' => $sessionKey,
+            'revenue_minor' => 0,
             'currency' => $this->support->stringValue($this->support->modelAttribute($session, 'currency'))
                 ?? (string) config('signals.defaults.currency', 'MYR'),
             'properties' => $this->support->enrichProperties($session, $trackedProperty, $properties),

@@ -24,6 +24,7 @@ use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 final class IngestSignalEvent implements SignalEventIngestor
@@ -42,55 +43,99 @@ final class IngestSignalEvent implements SignalEventIngestor
      */
     public function handle(TrackedProperty $trackedProperty, array $payload, bool $trusted): SignalEvent
     {
-        $identity = $this->resolveIdentity($trackedProperty, $payload);
-        $session = $this->resolveSession->handle($trackedProperty, $identity, $payload);
-        $occurredAt = $this->resolveOccurredAt($payload);
-        $rawProperties = is_array($payload['properties'] ?? null) ? $payload['properties'] : null;
-        $properties = $trusted ? $rawProperties : $this->filterProperties($rawProperties);
+        $ingestionSource = $trusted
+            ? SignalEvent::INGESTION_SOURCE_TRUSTED
+            : SignalEvent::INGESTION_SOURCE_BROWSER;
         $sourceEventId = $trusted ? $this->stringValue($payload['source_event_id'] ?? null) : null;
         $idempotencyKey = $this->stringValue($payload['idempotency_key'] ?? null)
             ?? ($trusted ? $sourceEventId : null);
 
         if ($idempotencyKey !== null) {
-            $existing = CrossTenantQuery::findExistingEvent($trackedProperty, $idempotencyKey);
+            $existing = CrossTenantQuery::findExistingEvent($trackedProperty, $ingestionSource, $idempotencyKey);
 
             if ($existing instanceof SignalEvent) {
                 return $existing;
             }
         }
 
-        $event = new SignalEvent([
-            'tracked_property_id' => $trackedProperty->id,
-            'signal_session_id' => $session?->id,
-            'signal_identity_id' => $identity?->id,
-            'occurred_at' => $occurredAt,
-            'event_name' => (string) $payload['event_name'],
-            'event_category' => (string) ($payload['event_category'] ?? 'custom'),
-            'idempotency_key' => $idempotencyKey,
-            'source_event_id' => $sourceEventId,
-            'path' => $payload['path'] ?? null,
-            'url' => $payload['url'] ?? null,
-            'referrer' => $payload['referrer'] ?? $session?->referrer,
-            'source' => $payload['source'] ?? ($payload['utm_source'] ?? $session?->utm_source),
-            'medium' => $payload['medium'] ?? ($payload['utm_medium'] ?? $session?->utm_medium),
-            'campaign' => $payload['campaign'] ?? ($payload['utm_campaign'] ?? $session?->utm_campaign),
-            'content' => $payload['content'] ?? ($payload['utm_content'] ?? $session?->utm_content),
-            'term' => $payload['term'] ?? ($payload['utm_term'] ?? $session?->utm_term),
-            'revenue_minor' => $trusted ? $this->normalizeRevenueMinor($payload['revenue_minor'] ?? 0) : 0,
-            'currency' => $trusted
-                ? (string) ($payload['currency'] ?? $trackedProperty->currency)
-                : (string) $trackedProperty->currency,
-            'properties' => $properties,
-            'property_types' => $this->propertyTypeInferrer->infer($properties),
-        ]);
-
-        $this->syncOwnerFromProperty($event, $trackedProperty);
+        $occurredAt = $this->resolveOccurredAt($payload);
+        $rawProperties = is_array($payload['properties'] ?? null) ? $payload['properties'] : null;
+        $properties = $trusted ? $rawProperties : $this->filterProperties($rawProperties);
+        $propertyTypes = $this->propertyTypeInferrer->infer($properties);
+        $revenueMinor = $trusted ? $this->normalizeRevenueMinor($payload['revenue_minor'] ?? 0) : 0;
+        $currency = $trusted
+            ? (string) ($payload['currency'] ?? $trackedProperty->currency)
+            : (string) $trackedProperty->currency;
 
         try {
-            $this->withTrackedPropertyOwner($trackedProperty, static fn (): bool => $event->save());
+            $event = $this->withTrackedPropertyOwner($trackedProperty, fn (): SignalEvent => DB::transaction(function () use (
+                $trackedProperty,
+                $payload,
+                $ingestionSource,
+                $sourceEventId,
+                $idempotencyKey,
+                $occurredAt,
+                $properties,
+                $propertyTypes,
+                $revenueMinor,
+                $currency
+            ): SignalEvent {
+                $identity = $this->resolveIdentity($trackedProperty, $payload);
+                $session = $this->resolveSession->handle($trackedProperty, $identity, $payload);
+
+                $event = new SignalEvent([
+                    'tracked_property_id' => $trackedProperty->id,
+                    'signal_session_id' => $session?->id,
+                    'signal_identity_id' => $identity?->id,
+                    'occurred_at' => $occurredAt,
+                    'event_name' => (string) $payload['event_name'],
+                    'event_category' => (string) ($payload['event_category'] ?? 'custom'),
+                    'ingestion_source' => $ingestionSource,
+                    'idempotency_key' => $idempotencyKey,
+                    'source_event_id' => $sourceEventId,
+                    'path' => $payload['path'] ?? null,
+                    'url' => $payload['url'] ?? null,
+                    'referrer' => $payload['referrer'] ?? $session?->referrer,
+                    'source' => $payload['source'] ?? ($payload['utm_source'] ?? $session?->utm_source),
+                    'medium' => $payload['medium'] ?? ($payload['utm_medium'] ?? $session?->utm_medium),
+                    'campaign' => $payload['campaign'] ?? ($payload['utm_campaign'] ?? $session?->utm_campaign),
+                    'content' => $payload['content'] ?? ($payload['utm_content'] ?? $session?->utm_content),
+                    'term' => $payload['term'] ?? ($payload['utm_term'] ?? $session?->utm_term),
+                    'revenue_minor' => $revenueMinor,
+                    'currency' => $currency,
+                    'properties' => $properties,
+                    'property_types' => $propertyTypes,
+                ]);
+
+                $this->syncOwnerFromProperty($event, $trackedProperty);
+                $event->save();
+
+                if ($session instanceof SignalSession) {
+                    $fresh = SignalSession::query()->lockForUpdate()->find($session->id);
+
+                    if ($fresh instanceof SignalSession) {
+                        if ($fresh->ended_at === null || $occurredAt->greaterThanOrEqualTo($fresh->ended_at)) {
+                            $fresh->exit_path = $payload['path'] ?? $fresh->exit_path;
+                            $fresh->ended_at = $occurredAt;
+                            $fresh->duration_milliseconds = max(0, (int) ($fresh->started_at?->diffInMilliseconds($occurredAt) ?? 0));
+                        }
+
+                        // Shared-locking read: after waiting on the session row lock, a
+                        // plain read could still see the pre-commit snapshot and
+                        // wrongly keep bounced_at on a multi-event session.
+                        $hasOtherEvents = $fresh->events()->whereKeyNot($event->id)->sharedLock()->value('id') !== null;
+                        $fresh->bounced_at = $hasOtherEvents ? null : $fresh->bounced_at ?? CarbonImmutable::now();
+                        $fresh->save();
+                    }
+                }
+
+                return $event;
+                // Bounded top-level retries: simultaneous duplicate inserts
+                // can deadlock on InnoDB; the retry then hits the winner path.
+            }, 5));
         } catch (QueryException $e) {
             $existing = $idempotencyKey !== null && DuplicateKeyViolation::is($e)
-                ? CrossTenantQuery::findExistingEvent($trackedProperty, $idempotencyKey)
+                ? CrossTenantQuery::findExistingEvent($trackedProperty, $ingestionSource, $idempotencyKey)
                 : null;
 
             if (! $existing instanceof SignalEvent) {
@@ -100,22 +145,9 @@ final class IngestSignalEvent implements SignalEventIngestor
             return $existing;
         }
 
-        if ($session instanceof SignalSession) {
-            $this->withTrackedPropertyOwner($trackedProperty, function () use ($session, $payload, $occurredAt, $event): bool {
-                $session->exit_path = $payload['path'] ?? $session->exit_path;
-                $session->ended_at = $occurredAt;
-                $durationMilliseconds = max(0, (int) ($session->started_at?->diffInMilliseconds($occurredAt) ?? 0));
-                $session->duration_milliseconds = $durationMilliseconds;
-                $hasOtherEvents = $session->wasRecentlyCreated
-                    ? false
-                    : $session->events()->whereKeyNot($event->id)->exists();
-                $session->bounced_at = $hasOtherEvents ? null : $session->bounced_at ?? CarbonImmutable::now();
-
-                return $session->save();
-            });
-        }
-
-        $this->evaluateAlertsAfterIngest($event);
+        DB::afterCommit(function () use ($event): void {
+            $this->evaluateAlertsAfterIngest($event);
+        });
 
         return $event;
     }

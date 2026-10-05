@@ -33,7 +33,7 @@ final class FilamentCartSignalRecorder
             'anonymous_id' => $cartIdentifier,
             'session_identifier' => $this->support->buildCartSessionIdentifier($cartIdentifier, $cartInstance),
             'occurred_at' => $occurredAt,
-            'revenue_minor' => $totalMinor,
+            'revenue_minor' => 0,
             'currency' => $currency,
             'source_event_id' => $sourceEventId,
             'properties' => array_filter([

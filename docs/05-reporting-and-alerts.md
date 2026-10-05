@@ -50,6 +50,7 @@ Routes with path parameters return a `starts_with` condition instead.
 3. `SignalAlertEvaluator` evaluates the rule against matching events.
 4. `SignalAlertDispatcher` writes `SignalAlertLog` records and dispatches configured channels.
 5. `signals:process-alerts` runs scheduled evaluation.
+6. `DispatchSignalAlertDelivery` claims each delivery, sends outside any database transaction, then finalizes under a fresh row lock: a terminal `sent`/`dead` row always wins, a stale completion never regresses a newer claim, and `sent_at`/`dead_at` are preserved once set.
 
 ## Generic filters
 
@@ -81,7 +82,7 @@ Named destinations from config are preferred. Inline destinations are ignored un
 
 ## Idempotency
 
-`SignalEvent` supports an idempotency/source-event key unique per tracked property. Use it for listener retries and backfills.
+`SignalEvent` deduplicates on `(tracked_property_id, ingestion_source, idempotency_key)`: the same raw key submitted on browser and trusted boundaries creates two distinct events, while retries within one boundary return the original event. Trusted paths fall back to `source_event_id` when no explicit key is given. Use keys for listener retries within one boundary.
 
 ## Owner scoping
 

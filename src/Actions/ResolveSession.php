@@ -9,11 +9,13 @@ use AIArmada\Signals\Models\SignalIdentity;
 use AIArmada\Signals\Models\SignalSession;
 use AIArmada\Signals\Models\TrackedProperty;
 use AIArmada\Signals\Services\SignalUserAgentParser;
+use AIArmada\Signals\Support\CrossTenantQuery;
 use AIArmada\Signals\Support\DuplicateKeyViolation;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 final class ResolveSession
 {
@@ -32,22 +34,8 @@ final class ResolveSession
             return null;
         }
 
-        $session = SignalSession::query()
-            ->withoutOwnerScope()
-            ->where('tracked_property_id', $trackedProperty->id)
-            ->where('session_identifier', $sessionIdentifier)
-            ->first();
-
         $startedAt = $this->parseTimestamp($payload['session_started_at'] ?? null)
             ?? $this->resolveOccurredAt($payload);
-
-        if (! $session instanceof SignalSession) {
-            $session = new SignalSession([
-                'tracked_property_id' => $trackedProperty->id,
-                'session_identifier' => $sessionIdentifier,
-                'started_at' => $startedAt,
-            ]);
-        }
 
         $rawUserAgent = null;
         /** @var array{device_type: string|null, device_brand: string|null, device_model: string|null, browser: string|null, browser_version: string|null, os: string|null, os_version: string|null, is_bot: bool} $parsed */
@@ -71,60 +59,101 @@ final class ResolveSession
         }
 
         $isBot = is_bool($payload['is_bot'] ?? null) ? $payload['is_bot'] : ($parsed['is_bot'] ?? false);
-
         $storeRaw = (bool) config('signals.features.ua_parsing.store_raw', true);
-
-        $session->fill([
-            'signal_identity_id' => $identity?->id,
-            'entry_path' => $session->entry_path ?? ($payload['path'] ?? null),
-            'exit_path' => $payload['path'] ?? $session->exit_path,
-            'country_code' => $session->country_code ?? $this->resolveCountryCode($request, $payload),
-            'country_source' => $session->country_source ?? $this->resolveCountrySource($request, $payload),
-            'device_type' => $payload['device_type'] ?? ($parsed['device_type'] ?? $session->device_type),
-            'device_brand' => $payload['device_brand'] ?? ($parsed['device_brand'] ?? $session->device_brand),
-            'device_model' => $payload['device_model'] ?? ($parsed['device_model'] ?? $session->device_model),
-            'browser' => $payload['browser'] ?? ($parsed['browser'] ?? $session->browser),
-            'browser_version' => $payload['browser_version'] ?? ($parsed['browser_version'] ?? $session->browser_version),
-            'os' => $payload['os'] ?? ($parsed['os'] ?? $session->os),
-            'os_version' => $payload['os_version'] ?? ($parsed['os_version'] ?? $session->os_version),
-            'identified_as_bot_at' => $isBot ? CarbonImmutable::now() : null,
-            'user_agent' => $session->user_agent ?? ($rawUserAgent !== null && $storeRaw ? $rawUserAgent : null),
-            'ip_address' => $session->ip_address ?? $capturedIp,
-            'referrer' => $session->referrer ?? ($payload['referrer'] ?? null),
-            'utm_source' => $payload['utm_source'] ?? $session->utm_source,
-            'utm_medium' => $payload['utm_medium'] ?? $session->utm_medium,
-            'utm_campaign' => $payload['utm_campaign'] ?? $session->utm_campaign,
-            'utm_content' => $payload['utm_content'] ?? $session->utm_content,
-            'utm_term' => $payload['utm_term'] ?? $session->utm_term,
-        ]);
-
-        if (! $session->exists) {
-            $session->bounced_at = CarbonImmutable::now();
-        }
-
-        $this->syncOwnerFromProperty($session, $trackedProperty);
+        $owner = OwnerContext::fromTypeAndId($trackedProperty->owner_type, $trackedProperty->owner_id);
 
         try {
-            $owner = OwnerContext::fromTypeAndId($trackedProperty->owner_type, $trackedProperty->owner_id);
-            OwnerContext::withOwner($owner, static fn (): bool => $session->save());
+            return OwnerContext::withOwner($owner, fn (): SignalSession => DB::transaction(function () use (
+                $trackedProperty,
+                $identity,
+                $payload,
+                $sessionIdentifier,
+                $startedAt,
+                $request,
+                $parsed,
+                $rawUserAgent,
+                $capturedIp,
+                $isBot,
+                $storeRaw
+            ): SignalSession {
+                // Non-locking existence probe first: locking a missing row
+                // would take a gap lock and deadlock concurrent creators.
+                $knownId = CrossTenantQuery::sessionQuery($trackedProperty, $sessionIdentifier)->value('id');
 
-            return $session;
+                if ($knownId !== null) {
+                    $locked = CrossTenantQuery::sessionQuery($trackedProperty, $sessionIdentifier)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($locked instanceof SignalSession) {
+                        $this->fillSession($locked, $identity, $payload, $request, $parsed, $rawUserAgent, $capturedIp, $isBot, $storeRaw);
+                        $this->syncOwnerFromProperty($locked, $trackedProperty);
+                        $locked->save();
+
+                        return $locked;
+                    }
+                }
+
+                $session = new SignalSession([
+                    'tracked_property_id' => $trackedProperty->id,
+                    'session_identifier' => $sessionIdentifier,
+                    'started_at' => $startedAt,
+                ]);
+                $this->fillSession($session, $identity, $payload, $request, $parsed, $rawUserAgent, $capturedIp, $isBot, $storeRaw);
+                $session->bounced_at = CarbonImmutable::now();
+                $this->syncOwnerFromProperty($session, $trackedProperty);
+                $session->save();
+
+                return $session;
+            }));
         } catch (QueryException $e) {
             if (! DuplicateKeyViolation::is($e)) {
                 throw $e;
             }
         }
 
-        $session = SignalSession::query()
-            ->withoutOwnerScope()
-            ->where('tracked_property_id', $trackedProperty->id)
-            ->where('session_identifier', $sessionIdentifier)
-            ->firstOrFail();
+        return OwnerContext::withOwner($owner, fn (): SignalSession => DB::transaction(function () use (
+            $trackedProperty,
+            $identity,
+            $payload,
+            $sessionIdentifier,
+            $request,
+            $parsed,
+            $rawUserAgent,
+            $capturedIp,
+            $isBot,
+            $storeRaw
+        ): SignalSession {
+            $session = CrossTenantQuery::sessionQuery($trackedProperty, $sessionIdentifier)
+                ->lockForUpdate()
+                ->firstOrFail();
 
+            $this->fillSession($session, $identity, $payload, $request, $parsed, $rawUserAgent, $capturedIp, $isBot, $storeRaw);
+            $this->syncOwnerFromProperty($session, $trackedProperty);
+            $session->save();
+
+            return $session;
+        }));
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array{device_type: string|null, device_brand: string|null, device_model: string|null, browser: string|null, browser_version: string|null, os: string|null, os_version: string|null, is_bot: bool}  $parsed
+     */
+    private function fillSession(
+        SignalSession $session,
+        ?SignalIdentity $identity,
+        array $payload,
+        ?Request $request,
+        array $parsed,
+        ?string $rawUserAgent,
+        ?string $capturedIp,
+        bool $isBot,
+        bool $storeRaw,
+    ): void {
         $session->fill([
             'signal_identity_id' => $identity?->id,
             'entry_path' => $session->entry_path ?? ($payload['path'] ?? null),
-            'exit_path' => $payload['path'] ?? $session->exit_path,
             'country_code' => $session->country_code ?? $this->resolveCountryCode($request, $payload),
             'country_source' => $session->country_source ?? $this->resolveCountrySource($request, $payload),
             'device_type' => $payload['device_type'] ?? ($parsed['device_type'] ?? $session->device_type),
@@ -144,12 +173,6 @@ final class ResolveSession
             'utm_content' => $payload['utm_content'] ?? $session->utm_content,
             'utm_term' => $payload['utm_term'] ?? $session->utm_term,
         ]);
-
-        $this->syncOwnerFromProperty($session, $trackedProperty);
-        $owner = OwnerContext::fromTypeAndId($trackedProperty->owner_type, $trackedProperty->owner_id);
-        OwnerContext::withOwner($owner, static fn (): bool => $session->save());
-
-        return $session;
     }
 
     /**

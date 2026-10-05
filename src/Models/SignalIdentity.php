@@ -6,6 +6,7 @@ namespace AIArmada\Signals\Models;
 
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
+use AIArmada\Signals\Support\SignalOwnershipGuard;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -94,6 +95,10 @@ final class SignalIdentity extends Model
 
     protected static function booted(): void
     {
+        static::saving(function (SignalIdentity $identity): void {
+            SignalOwnershipGuard::assertIdentityWrite($identity);
+        });
+
         static::deleting(function (SignalIdentity $identity): void {
             $identity->sessions()->update(['signal_identity_id' => null]);
             $identity->events()->update(['signal_identity_id' => null]);

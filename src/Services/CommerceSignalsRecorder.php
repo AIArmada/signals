@@ -67,14 +67,14 @@ final class CommerceSignalsRecorder
         return $this->checkout->recordStarted($session);
     }
 
-    public function recordOrderPaid(Model $order, ?string $transactionId = null, ?string $gateway = null): ?SignalEvent
+    public function recordOrderPaid(Model $order, string $transactionId, string $gateway, int $amount): ?SignalEvent
     {
-        return $this->orders->recordPaid($order, $transactionId, $gateway);
+        return $this->orders->recordPaid($order, $transactionId, $gateway, $amount);
     }
 
-    public function recordOrderRefunded(Model $order, int $amount, ?string $reason = null): ?SignalEvent
+    public function recordOrderRefunded(Model $order, string $refundId, int $amount, ?string $reason = null): ?SignalEvent
     {
-        return $this->orders->recordRefunded($order, $amount, $reason);
+        return $this->orders->recordRefunded($order, $refundId, $amount, $reason);
     }
 
     public function recordCartItemAdded(object $cart, object $item): ?SignalEvent

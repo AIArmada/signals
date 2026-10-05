@@ -22,6 +22,9 @@ php artisan vendor:publish --tag=signals-config
 php artisan migrate
 ```
 
+> **warning**
+> The owning migration describes the required current schema: `signal_events` carries a non-null `ingestion_source` column (`browser` or `trusted`) and the idempotency unique scope is `(tracked_property_id, ingestion_source, idempotency_key)` under the explicit index `signal_events_idem_unique`. Existing deployments need their schema aligned with the owning migration by the deployment process.
+
 ## 4. Configure a tracked property
 
 Create at least one `TrackedProperty` record and keep its `write_key` for ingestion requests.

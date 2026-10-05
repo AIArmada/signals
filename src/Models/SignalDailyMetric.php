@@ -6,6 +6,7 @@ namespace AIArmada\Signals\Models;
 
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
+use AIArmada\Signals\Support\SignalOwnershipGuard;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -74,5 +75,12 @@ final class SignalDailyMetric extends Model
     public function trackedProperty(): BelongsTo
     {
         return $this->belongsTo(TrackedProperty::class, 'tracked_property_id');
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (SignalDailyMetric $metric): void {
+            SignalOwnershipGuard::assertDailyMetricWrite($metric);
+        });
     }
 }

@@ -9,12 +9,16 @@ use AIArmada\Signals\Models\SignalIdentity;
 use AIArmada\Signals\Models\TrackedProperty;
 use AIArmada\Signals\Services\SignalPropertyFilter;
 use AIArmada\Signals\Services\SignalsIngestionRequestValidator;
+use AIArmada\Signals\Support\CrossTenantQuery;
+use AIArmada\Signals\Support\DuplicateKeyViolation;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -59,9 +63,55 @@ final class IdentifySignalIdentity
         $this->syncOwnerFromProperty($identity, $trackedProperty);
         $owner = OwnerContext::fromTypeAndId($trackedProperty->owner_type, $trackedProperty->owner_id);
 
-        OwnerContext::withOwner($owner, static fn (): bool => $identity->save());
+        try {
+            OwnerContext::withOwner($owner, static fn (): bool => (bool) DB::transaction(static fn (): bool => $identity->save()));
 
-        return $identity;
+            return $identity;
+        } catch (QueryException $e) {
+            if (! DuplicateKeyViolation::is($e) || ($payload['external_id'] ?? null) === null) {
+                throw $e;
+            }
+
+            $duplicate = $e;
+        }
+
+        $externalId = (string) $payload['external_id'];
+
+        return OwnerContext::withOwner($owner, fn (): SignalIdentity => DB::transaction(function () use (
+            $trackedProperty,
+            $payload,
+            $externalId,
+            $duplicate,
+            $traits,
+            $seenAt,
+            $authUserType,
+            $authUserId
+        ): SignalIdentity {
+            // Locking read: sees the currently committed winner even when the
+            // surrounding transaction runs under repeatable read.
+            $winner = CrossTenantQuery::identityQuery($trackedProperty, $externalId)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $winner instanceof SignalIdentity) {
+                throw $duplicate;
+            }
+
+            $winner->fill([
+                'email' => $payload['email'] ?? $winner->email,
+                'anonymous_id' => $payload['anonymous_id'] ?? $winner->anonymous_id,
+                'traits' => $traits ?? $winner->traits,
+                'first_seen_at' => $winner->first_seen_at ?? $seenAt,
+                'last_seen_at' => $seenAt,
+                'auth_user_type' => $authUserType ?? $winner->auth_user_type,
+                'auth_user_id' => $authUserId ?? $winner->auth_user_id,
+            ]);
+
+            $this->syncOwnerFromProperty($winner, $trackedProperty);
+            $winner->save();
+
+            return $winner;
+        }));
     }
 
     public function asController(Request $request): JsonResponse

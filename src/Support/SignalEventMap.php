@@ -89,15 +89,17 @@ final class SignalEventMap
                 'method' => 'recordOrderPaid',
                 'arguments' => [
                     ['property' => 'order', 'type' => 'model'],
-                    ['property' => 'transactionId', 'type' => 'scalar'],
-                    ['property' => 'gateway', 'type' => 'scalar'],
+                    ['property' => 'transactionId', 'type' => 'required_scalar'],
+                    ['property' => 'gateway', 'type' => 'required_scalar'],
+                    ['property' => 'amount', 'type' => 'required_numeric_int'],
                 ],
             ],
             'AIArmada\\Orders\\Events\\OrderRefunded' => [
                 'method' => 'recordOrderRefunded',
                 'arguments' => [
                     ['property' => 'order', 'type' => 'model'],
-                    ['property' => 'amount', 'type' => 'numeric_int'],
+                    ['property' => 'refundId', 'type' => 'required_scalar'],
+                    ['property' => 'amount', 'type' => 'required_numeric_int'],
                     ['property' => 'reason', 'type' => 'scalar'],
                 ],
             ],

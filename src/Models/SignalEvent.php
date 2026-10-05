@@ -6,6 +6,7 @@ namespace AIArmada\Signals\Models;
 
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
+use AIArmada\Signals\Support\SignalOwnershipGuard;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable $occurred_at
  * @property string $event_name
  * @property string $event_category
+ * @property string $ingestion_source
  * @property string|null $idempotency_key
  * @property string|null $source_event_id
  * @property string|null $path
@@ -45,6 +47,10 @@ final class SignalEvent extends Model
     use HasOwnerScopeConfig;
     use HasUuids;
 
+    public const string INGESTION_SOURCE_BROWSER = 'browser';
+
+    public const string INGESTION_SOURCE_TRUSTED = 'trusted';
+
     protected static string $ownerScopeConfigKey = 'signals.owner';
 
     /** @var list<string> */
@@ -55,6 +61,7 @@ final class SignalEvent extends Model
         'occurred_at',
         'event_name',
         'event_category',
+        'ingestion_source',
         'idempotency_key',
         'source_event_id',
         'path',
@@ -111,5 +118,14 @@ final class SignalEvent extends Model
     public function identity(): BelongsTo
     {
         return $this->belongsTo(SignalIdentity::class, 'signal_identity_id');
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (SignalEvent $event): void {
+            $event->ingestion_source ??= self::INGESTION_SOURCE_BROWSER;
+
+            SignalOwnershipGuard::assertEventWrite($event);
+        });
     }
 }

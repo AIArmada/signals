@@ -75,7 +75,7 @@ These names are used when resolving a write key and session identifier from inbo
 ],
 ```
 
-These toggles let you suppress specific built-in commerce recordings without disabling the entire integration surface.
+These toggles let you suppress specific built-in commerce recordings without disabling the entire integration surface. Map keys are literal event names containing dots; they are matched exactly, not as nested config paths.
 
 ## Owner
 
@@ -88,6 +88,8 @@ These toggles let you suppress specific built-in commerce recordings without dis
 ```
 
 Owner mode is opt-in for Signals. With the default config, browser/global analytics can run without a resolved owner. Once you enable owner mode, tracked-property resolution, writes, and admin queries follow the configured owner boundary and require either a resolved owner or explicit global context.
+
+Telemetry integrity always applies: referenced properties, sessions, and identities must exist, `tracked_property_id` is immutable once persisted for identities, sessions, and events, and events/sessions reject missing or cross-property session/identity references even when owner scoping is disabled. Disabling owner mode only disables tenant authorization, not dangling-reference protection. When owner mode is enabled, every child-model write is additionally ownership-validated: identities, sessions, events, daily metrics, interaction rules, and alert deliveries reject foreign `tracked_property_id` / `signal_alert_log_id` references with an authorization failure. Explicit global context may only reference global-only rows.
 
 ## Ingestion
 

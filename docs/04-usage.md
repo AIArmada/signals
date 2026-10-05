@@ -91,6 +91,8 @@ Optional device fields can be passed explicitly. When `ua_parsing` is enabled th
 
 The browser route is deliberately non-financial. It enforces a configurable event allowlist, bounded payload size/depth/key counts, and rate limiting by write key plus client address. Revenue, currency, order/conversion/transaction identifiers, and source event IDs are rejected. Retries may pass an optional client `idempotency_key`; repeated submissions with the same key return the original event instead of duplicating it. `Origin`, `Referer`, and the page URL are domain-policy signals only; they are not authentication.
 
+Idempotency keys live in per-boundary namespaces. Every event stores an `ingestion_source` of `browser` or `trusted`, derived from the ingestion path (never from browser input), and the uniqueness scope is `(tracked_property_id, ingestion_source, idempotency_key)`. The same raw key submitted on both the browser route and the trusted route (or trusted recorders) therefore creates two distinct events, while retries within one boundary keep deduplicating. Deduplication is checked before identity and session writes, so retries do not create new side effects.
+
 Collect limits live in `signals.ingestion.browser` (full table in `03-configuration.md`): the four public routes (`identify`, `browser-event`, `pageview`, `geo`) share the named `throttle:signals-collect` limiter plus per-IP (`rate_limit_per_minute`, 120) and per-property (`property_rate_limit_per_minute`, 120) checks, payload caps (`max_bytes` 32768, `max_depth` 4, `max_keys` 64), and the `event_allowlist`.
 
 ### Trusted Server Outcome
@@ -293,14 +295,22 @@ use AIArmada\Signals\Services\CommerceSignalsRecorder;
 
 $recorder = app(CommerceSignalsRecorder::class);
 
-$recorder->recordOrderPaid($order);
+$recorder->recordOrderPaid($order, $transactionId, $gateway, $amount);
+$recorder->recordOrderRefunded($order, $refundId, $amount, $reason);
 $recorder->recordCheckoutCompleted($checkout);
 $recorder->recordAffiliateAttributed($attribution);
 $recorder->recordAffiliateConversionRecorded($conversion);
 $recorder->recordLinkClicked($link, $click);
 ```
 
-The `signals.recording.events.*` toggles let you disable selected built-in recorder outputs without removing the surrounding integration.
+The `signals.recording.events.*` toggles let you disable selected built-in recorder outputs without removing the surrounding integration. Keys are literal dotted event names (`checkout.started`, `checkout.completed`, `order.paid`, `order.refunded`); set a key to `false` to suppress that transition.
+
+> **warning**
+> Recognized revenue semantics changed. Built-in order revenue is recorded by `order.paid` using the actual paid amount from the order event; the full order total stays in the `order_total_minor` property and the actual payment amount stays in the `paid_amount_minor` property. `checkout.started` and `checkout.completed` keep the cart/order value in the `total_minor` property but record `revenue_minor: 0`, so abandoned checkouts no longer inflate revenue. `order.refunded` records `revenue_minor: 0` with the refunded amount in `refund_amount_minor`; affiliate conversions record `revenue_minor: 0` with `value_minor` / `commission_minor` properties; cart snapshot events record `revenue_minor: 0` with `cart_total_minor`. Explicit signed trusted outcomes (`server-outcome`) can still record revenue directly. There is no currency conversion, no net-revenue backfill, and no legacy fallback: update any dashboards or alerts that summed checkout or refund `revenue_minor`.
+
+Built-in recorders emit stable idempotency keys for one-time lifecycle transitions so listener retries do not duplicate them: checkout keys derive from the session id plus transition (`started` / `completed`); `order.paid` keys are `order-paid:` plus a SHA-256 hash of the JSON-encoded `[order id, gateway, transaction id]` tuple (all required, no timestamp fallback); `order.refunded` keys are `order-refunded:` plus a SHA-256 hash of the JSON-encoded `[order id, refund id]` tuple (required, no amount/reason/date fallback). Hashing keeps keys within the 255-character column for max-length gateway and transaction ids and avoids delimiter collisions; the raw transaction or refund id stays in `source_event_id` and the event properties. Affiliate conversion and link click keys derive from their stable source ids. Cart, voucher, affiliate-network, and affiliate-attribution interactions have no idempotency keys: repeated interactions record distinct events.
+
+Disabled commerce recordings are no-ops at the public recorder boundary: `order.paid` and `order.refunded` return `null` before reading mandatory source attributes or resolving a tracked property when their `signals.recording.events.*` toggle is `false`.
 
 Field mapping lives in per-source recorders (`AIArmada\Signals\Services\Recorders\CartSignalRecorder`, `CheckoutSignalRecorder`, `OrderSignalRecorder`, `FilamentCartSignalRecorder`, `VoucherSignalRecorder`, `AffiliateSignalRecorder`, `AffiliateNetworkSignalRecorder`, `LinkSignalRecorder`); `CommerceSignalsRecorder` stays the stable dispatcher. Trusted paths fail loud — `SignalRecorderSupport::requiredModelInt()` and friends throw `InvalidArgumentException` on missing fields. Browser ingestion stays lenient: `IngestSignalEvent` (`trusted: false`) defaults missing fields and forces `revenue_minor` to `0`.
 
@@ -334,8 +344,9 @@ $result = EvaluateAlertRules::run(); // ['processed' => 5, 'skipped' => 1, 'disp
 $result = EvaluateAlertRules::run(trackedPropertyId: $property->id, dryRun: true);
 ```
 
-- **`IngestSignalEvent`** — requires callers to explicitly choose `trusted: true` or `trusted: false`, then handles identity resolution, session stitching, property allowlisting, idempotency via `idempotency_key` (`source_event_id` fallback on trusted paths), and optional on-ingest alert evaluation.
-- **`ResolveSession`** — resolves or creates sessions with device/UA parsing, IP capture (Cloudflare-aware behind trusted proxies), country detection, and attribution enrichment (UTM/referrer). It has no `AsAction` trait, so call it through the container with `handle()` rather than `::run()`.
+- **`IngestSignalEvent`** — requires callers to explicitly choose `trusted: true` or `trusted: false`, then handles boundary-scoped idempotency via `idempotency_key` (`source_event_id` fallback on trusted paths), identity resolution, session stitching, and property allowlisting, plus optional on-ingest alert evaluation scheduled with `DB::afterCommit` so queued and inline alert effects only run after the outermost transaction commits and are discarded on rollback. Simultaneous duplicate ingestion on one boundary persists exactly one event and rolls back the loser's session/identity side effects; the owning top-level transaction retries deadlocks a bounded number of times before surfacing them, and when you already own an outer transaction around ingestion that outer `DB::transaction(..., attempts: 5)` owns the retry while nested savepoints do not retry locally. Session `ended_at`, `duration_milliseconds`, and `exit_path` only ever advance to the latest event time, so out-of-order and backdated events cannot shrink a session, and `bounced_at` clears once a second event lands on the session.
+- **`IdentifySignalIdentity`** — resolves or creates identities by `external_id`/`anonymous_id`. A duplicate `external_id` insert recovers by re-reading the committed winner under a row lock inside a transaction (which also sees past a repeatable-read snapshot) and updating it, instead of failing or creating a second row.
+- **`ResolveSession`** — resolves or creates sessions with device/UA parsing, IP capture (Cloudflare-aware behind trusted proxies), country detection, and attribution enrichment (UTM/referrer). Session creation probes existence without locking first and only locks known existing rows, so concurrent creators never deadlock on gap locks; a duplicate-create collision still recovers onto the freshly locked row. Reads and metadata mutations stay serialized per session without serializing unrelated property traffic. It has no `AsAction` trait, so call it through the container with `handle()` rather than `::run()`.
 - **`EvaluateAlertRules`** — iterates active `SignalAlertRule` records through the `SignalAlertEvaluator` and dispatches matched alerts via the `SignalAlertDispatcher`.
 
 ## Aggregation and Alerting

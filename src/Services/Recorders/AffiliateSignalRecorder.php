@@ -126,6 +126,8 @@ final class AffiliateSignalRecorder
             'anonymous_id' => $subjectKey,
             'session_identifier' => $this->support->buildAffiliateSessionIdentifier($subjectKey, $subjectInstance ?? 'default'),
             'occurred_at' => $this->support->requiredModelTimestamp($conversionModel, ['occurred_at', 'created_at']),
+            'idempotency_key' => 'affiliate-conversion:' . $conversionModel->getKey(),
+            'source_event_id' => (string) $conversionModel->getKey(),
             'path' => $attributionModel instanceof Model ? $this->support->stringValue($attributionModel->getAttribute('landing_url')) : null,
             'url' => $attributionModel instanceof Model ? $this->support->stringValue($attributionModel->getAttribute('landing_url')) : null,
             'referrer' => $attributionModel instanceof Model ? $this->support->stringValue($attributionModel->getAttribute('referrer_url')) : null,
@@ -134,7 +136,7 @@ final class AffiliateSignalRecorder
             'campaign' => $attributionModel instanceof Model ? $this->support->stringValue($attributionModel->getAttribute('campaign')) : null,
             'content' => $attributionModel instanceof Model ? $this->support->stringValue($attributionModel->getAttribute('content')) : null,
             'term' => $attributionModel instanceof Model ? $this->support->stringValue($attributionModel->getAttribute('term')) : null,
-            'revenue_minor' => $revenueMinor,
+            'revenue_minor' => 0,
             'currency' => $this->support->stringValue($conversionModel->getAttribute('commission_currency'))
                 ?? (string) config('signals.defaults.currency', 'MYR'),
             'properties' => array_filter([

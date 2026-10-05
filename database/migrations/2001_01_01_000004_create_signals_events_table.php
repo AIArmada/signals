@@ -21,6 +21,7 @@ return new class extends Migration
             $table->timestampTz('occurred_at');
             $table->string('event_name');
             $table->string('event_category')->default('custom');
+            $table->string('ingestion_source', 16)->default('browser');
             $table->string('idempotency_key')->nullable();
             $table->string('source_event_id')->nullable();
             $table->string('path')->nullable();
@@ -40,7 +41,7 @@ return new class extends Migration
             $table->index(['tracked_property_id', 'occurred_at']);
             $table->index(['event_category', 'occurred_at']);
             $table->index(['event_name', 'occurred_at']);
-            $table->unique(['tracked_property_id', 'idempotency_key']);
+            $table->unique(['tracked_property_id', 'ingestion_source', 'idempotency_key'], 'signal_events_idem_unique');
             $table->index(['tracked_property_id', 'source_event_id']);
             $table->index(['source', 'campaign']);
         });

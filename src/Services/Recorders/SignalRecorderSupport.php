@@ -275,9 +275,13 @@ final class SignalRecorderSupport
 
     public function isEventRecordingEnabled(string $eventName): bool
     {
-        $value = config('signals.recording.events.' . $eventName);
+        $events = config('signals.recording.events', []);
 
-        return $value === null || (bool) $value;
+        if (! is_array($events) || ! array_key_exists($eventName, $events)) {
+            return true;
+        }
+
+        return (bool) $events[$eventName];
     }
 
     public function resolveAffiliateModel(
