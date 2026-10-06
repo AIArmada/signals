@@ -34,6 +34,18 @@ final class CommerceSignalsIntegrationRegistrar
         if (config('signals.integrations.affiliates.listen_for_conversion_recorded', true)) {
             $this->listenIfAvailable('AIArmada\\Affiliates\\Events\\AffiliateConversionRecorded');
         }
+
+        if (config('signals.integrations.affiliates.listen_for_created', false)) {
+            $this->listenIfAvailable('AIArmada\\Affiliates\\Events\\AffiliateCreated');
+        }
+
+        if (config('signals.integrations.affiliates.listen_for_program_joined', false)) {
+            $this->listenIfAvailable('AIArmada\\Affiliates\\Events\\AffiliateProgramJoined');
+        }
+
+        if (config('signals.integrations.affiliates.listen_for_fraud_detected', false)) {
+            $this->listenIfAvailable('AIArmada\\Affiliates\\Events\\FraudSignalDetected');
+        }
     }
 
     private function bootCartIntegration(): void

@@ -6,6 +6,7 @@ namespace AIArmada\Signals\Actions;
 
 use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\Signals\Contracts\SignalEventIngestor;
+use AIArmada\Signals\Exceptions\CommerceSignalRecordingFailed;
 use AIArmada\Signals\Jobs\EvaluateSignalAlertsForEvent;
 use AIArmada\Signals\Models\SignalAlertRule;
 use AIArmada\Signals\Models\SignalEvent;
@@ -19,6 +20,7 @@ use AIArmada\Signals\Services\SignalPropertyFilter;
 use AIArmada\Signals\Services\SignalsIngestionRequestValidator;
 use AIArmada\Signals\Support\CrossTenantQuery;
 use AIArmada\Signals\Support\DuplicateKeyViolation;
+use AIArmada\Signals\Support\RecordingTransaction;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\QueryException;
@@ -26,6 +28,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Throwable;
 
 final class IngestSignalEvent implements SignalEventIngestor
 {
@@ -68,7 +71,7 @@ final class IngestSignalEvent implements SignalEventIngestor
             : (string) $trackedProperty->currency;
 
         try {
-            $event = $this->withTrackedPropertyOwner($trackedProperty, fn (): SignalEvent => DB::transaction(function () use (
+            $event = $this->withTrackedPropertyOwner($trackedProperty, fn (): SignalEvent => RecordingTransaction::run(function () use (
                 $trackedProperty,
                 $payload,
                 $ingestionSource,
@@ -145,8 +148,16 @@ final class IngestSignalEvent implements SignalEventIngestor
             return $existing;
         }
 
-        DB::afterCommit(function () use ($event): void {
-            $this->evaluateAlertsAfterIngest($event);
+        DB::afterCommit(function () use ($event, $trackedProperty): void {
+            try {
+                $this->evaluateAlertsAfterIngest($event);
+            } catch (Throwable $e) {
+                // The event is already persisted; a failing optional alert
+                // evaluation must not fail ingestion or the outer commit.
+                CommerceSignalRecordingFailed::reportSafely(
+                    CommerceSignalRecordingFailed::forAlertEvaluation($event, $trackedProperty, $e)
+                );
+            }
         });
 
         return $event;

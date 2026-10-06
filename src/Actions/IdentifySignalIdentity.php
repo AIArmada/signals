@@ -11,6 +11,7 @@ use AIArmada\Signals\Services\SignalPropertyFilter;
 use AIArmada\Signals\Services\SignalsIngestionRequestValidator;
 use AIArmada\Signals\Support\CrossTenantQuery;
 use AIArmada\Signals\Support\DuplicateKeyViolation;
+use AIArmada\Signals\Support\RecordingTransaction;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -18,7 +19,6 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -64,7 +64,7 @@ final class IdentifySignalIdentity
         $owner = OwnerContext::fromTypeAndId($trackedProperty->owner_type, $trackedProperty->owner_id);
 
         try {
-            OwnerContext::withOwner($owner, static fn (): bool => (bool) DB::transaction(static fn (): bool => $identity->save()));
+            OwnerContext::withOwner($owner, static fn (): bool => (bool) RecordingTransaction::run(static fn (): bool => $identity->save()));
 
             return $identity;
         } catch (QueryException $e) {
@@ -77,7 +77,7 @@ final class IdentifySignalIdentity
 
         $externalId = (string) $payload['external_id'];
 
-        return OwnerContext::withOwner($owner, fn (): SignalIdentity => DB::transaction(function () use (
+        return OwnerContext::withOwner($owner, fn (): SignalIdentity => RecordingTransaction::run(function () use (
             $trackedProperty,
             $payload,
             $externalId,

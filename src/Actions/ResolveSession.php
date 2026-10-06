@@ -11,11 +11,11 @@ use AIArmada\Signals\Models\TrackedProperty;
 use AIArmada\Signals\Services\SignalUserAgentParser;
 use AIArmada\Signals\Support\CrossTenantQuery;
 use AIArmada\Signals\Support\DuplicateKeyViolation;
+use AIArmada\Signals\Support\RecordingTransaction;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 final class ResolveSession
 {
@@ -63,7 +63,7 @@ final class ResolveSession
         $owner = OwnerContext::fromTypeAndId($trackedProperty->owner_type, $trackedProperty->owner_id);
 
         try {
-            return OwnerContext::withOwner($owner, fn (): SignalSession => DB::transaction(function () use (
+            return OwnerContext::withOwner($owner, fn (): SignalSession => RecordingTransaction::run(function () use (
                 $trackedProperty,
                 $identity,
                 $payload,
@@ -112,7 +112,7 @@ final class ResolveSession
             }
         }
 
-        return OwnerContext::withOwner($owner, fn (): SignalSession => DB::transaction(function () use (
+        return OwnerContext::withOwner($owner, fn (): SignalSession => RecordingTransaction::run(function () use (
             $trackedProperty,
             $identity,
             $payload,

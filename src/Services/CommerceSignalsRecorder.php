@@ -144,6 +144,21 @@ final class CommerceSignalsRecorder
         return $this->affiliates->recordConversion($conversion);
     }
 
+    public function recordAffiliateCreated(Model $affiliate): ?SignalEvent
+    {
+        return $this->affiliates->recordCreated($affiliate);
+    }
+
+    public function recordAffiliateProgramJoined(Model $affiliate, Model $program, Model $membership): ?SignalEvent
+    {
+        return $this->affiliates->recordProgramJoined($affiliate, $program, $membership);
+    }
+
+    public function recordAffiliateFraudSignalDetected(Model $signal): ?SignalEvent
+    {
+        return $this->affiliates->recordFraudSignalDetected($signal);
+    }
+
     public function recordOfferCreated(object $offer): ?SignalEvent
     {
         return $this->affiliateNetwork->recordOfferCreated($offer);

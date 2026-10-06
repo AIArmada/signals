@@ -413,12 +413,22 @@ Browser integration controls:
     'enabled'                        => true,
     'listen_for_attributed'          => true,
     'listen_for_conversion_recorded' => true,
+    'listen_for_created'             => false,
+    'listen_for_program_joined'      => false,
+    'listen_for_fraud_detected'      => false,
     'attributed_event_name'          => 'affiliate.attributed',
     'attributed_event_category'      => 'acquisition',
     'conversion_event_name'          => 'affiliate.conversion.recorded',
     'conversion_event_category'      => 'conversion',
+    'created_event_name'             => 'affiliate.created',
+    'program_joined_event_name'      => 'affiliate.program.joined',
+    'lifecycle_event_category'       => 'affiliate_lifecycle',
+    'fraud_detected_event_name'      => 'affiliate.fraud.detected',
+    'fraud_event_category'           => 'affiliate_risk',
 ],
 ```
+
+The three lifecycle listeners are opt-in because they are affiliate recruitment, program adoption, and risk metrics rather than visitor behavior, and they increase generic event counts. `affiliate.created` fires once per affiliate id at the affiliate `created_at` time, `affiliate.program.joined` fires once per successful membership id at the membership `approved_at` time (repeat approvals of the same membership deduplicate; leaving and rejoining mints a new membership id and a new event), and `affiliate.fraud.detected` fires once per fraud signal id at the signal `detected_at` time. All three record `revenue_minor: 0` with the tracked property currency, carry no visitor identity, session, or acquisition fields, and resolve the tracked property from the persisted affiliate row, never from the supplied event payload (program memberships and fraud signals carry derived affiliate ownership). Exact property envelopes: created carries `affiliate_id`, `affiliate_code`, `registration_approval_mode`; program joined carries `membership_id`, `affiliate_id`, `affiliate_code`, `program_id`, and `tier_id` when the membership has one; fraud detected carries `fraud_signal_id`, `affiliate_id`, `rule_code`, `severity`, `risk_points`, and `conversion_id` / `touchpoint_id` when the signal references them. Fraud output is a sanitized whitelist — rule facts only, no description, evidence, or reviewer details — and a detection is recorded as detected, never as confirmed fraud. Supplied affiliate and program ownership plus supplied membership and fraud references (affiliate, program, tier, conversion, touchpoint) that disagree with the canonical rows are rejected instead of recorded.
 
 Browser, cart, and Filament cart integrations can auto-create deterministic tracked properties per owner / global context when no active property exists.
 
