@@ -102,36 +102,29 @@ php artisan signals:process-alerts --dry-run
 - Final delivery failures lock the delivery row inside a transaction and leave `sent` and `dead` rows terminal. Send success and transport-error completion use the same locked reread: a completion that arrives after a terminal transition, or after a newer claim took over, is dropped instead of regressing the row.
 - Never mix `sent_at` and `dead_at` on one delivery: exactly one terminal timestamp is ever set. If both appear, the send raced a final failure on an older build; current builds finalize under a row lock.
 
-## Running the Opt-In Engine Concurrency Tests
+## Running the Opt-In PostgreSQL Concurrency Tests
 
-The `tests/src/Signals/Feature/Engine/` suite exercises real PostgreSQL and MariaDB locking (duplicate ingestion, identity/session races, alert commit boundaries, delivery finalization) with genuine multi-process races. It only runs when you point it at disposable `sigeng_`-prefixed databases; otherwise every engine test skips with the missing variable named. Engine coverage is PostgreSQL read committed and MariaDB repeatable read; Oracle MySQL remains unverified.
+The `tests/src/Signals/Feature/Engine/` suite exercises real PostgreSQL locking (duplicate ingestion, identity/session races, alert commit boundaries, delivery finalization) with genuine multi-process races. It runs only when you point it at a disposable `sigeng_`-prefixed database; otherwise each test skips and names the missing variable. Coverage uses PostgreSQL read committed and repeatable read isolation.
 
 ```bash
-export SIGNALS_ENGINE_PGSQL_DATABASE=sigeng_pg_example
+export SIGNALS_ENGINE_PGSQL_DATABASE=sigeng_example
 export SIGNALS_ENGINE_PGSQL_HOST=127.0.0.1
-export SIGNALS_ENGINE_PGSQL_PORT=5432
-export SIGNALS_ENGINE_PGSQL_USER=postgres
-export SIGNALS_ENGINE_MYSQL_DATABASE=sigeng_my_example
-export SIGNALS_ENGINE_MYSQL_HOST=127.0.0.1
-export SIGNALS_ENGINE_MYSQL_PORT=3306
-export SIGNALS_ENGINE_MYSQL_USER=root
-# Optional when the server is only reachable by socket:
-# export SIGNALS_ENGINE_MYSQL_SOCKET=/tmp/mysql.sock
+export SIGNALS_ENGINE_PGSQL_PORT=45432
+export SIGNALS_ENGINE_PGSQL_USER=share_rewards_test
 
 ./vendor/bin/pest --parallel tests/src/Signals/Feature/Engine
 ```
 
 > [!warning]
-> Only `sigeng_`-prefixed database names are accepted, and the suite migrates whatever they point at. Never set these variables to an application or shared database.
+> Only `sigeng_`-prefixed database names are accepted, and the suite migrates whatever they point at. Never set this variable to an application or shared database.
 
-Keep `app.timezone` at UTC and set the database session timezone in each Laravel connection config, not via process environment or runtime calls:
+Keep `app.timezone` at UTC and set the PostgreSQL session timezone in the connection config, not via process environment or runtime calls:
 
 ```php
 // config/database.php
 'pgsql' => [..., 'timezone' => 'UTC'],
-'mysql' => [..., 'timezone' => '+00:00'],
 ```
 
-Do not use `PGTZ` or `date_default_timezone_set()` for this. The live PostgreSQL server in testing ran `Asia/Kuala_Lumpur`, and only the connection-level session setting kept timestamps comparable; the engine suite asserts the session timezone on both drivers.
+Do not use `PGTZ` or `date_default_timezone_set()` for this. The engine suite asserts that the PostgreSQL connection session timezone is UTC.
 
 When you already own an outer transaction around ingestion or identity work, deadlock retry belongs to that outer `DB::transaction(..., attempts: 5)`. Nested savepoints surface deadlocks to the outer level instead of retrying locally.

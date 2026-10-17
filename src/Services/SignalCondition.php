@@ -351,7 +351,6 @@ final class SignalCondition
 
         return match ($driver) {
             'pgsql' => "{$column} #>> '{$postgresPath}'",
-            'mysql', 'mariadb' => "JSON_UNQUOTE(JSON_EXTRACT({$column}, '{$jsonPath}'))",
             'sqlite' => "CAST(json_extract({$column}, '{$jsonPath}') AS TEXT)",
             default => throw new RuntimeException("Unsupported database driver [{$driver}] for Signals property queries."),
         };
@@ -359,10 +358,12 @@ final class SignalCondition
 
     private static function castNumericExpression(Builder $query, string $expression): string
     {
-        return match (ConnectionDriver::name($query->getConnection())) {
+        $driver = ConnectionDriver::name($query->getConnection());
+
+        return match ($driver) {
             'pgsql' => "CAST({$expression} AS NUMERIC)",
-            'mysql', 'mariadb', 'sqlite' => "CAST({$expression} AS DECIMAL(20, 6))",
-            default => $expression,
+            'sqlite' => "CAST({$expression} AS DECIMAL(20, 6))",
+            default => throw new RuntimeException("Unsupported database driver [{$driver}] for Signals numeric property queries."),
         };
     }
 
