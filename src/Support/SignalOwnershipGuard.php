@@ -14,6 +14,7 @@ use AIArmada\Signals\Models\SignalSession;
 use AIArmada\Signals\Models\TrackedProperty;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
 
 /**
  * Shared write boundary for Signals child models.
@@ -51,15 +52,16 @@ final class SignalOwnershipGuard
         self::assertTrackedPropertyImmutable($event);
 
         if (! self::ownerScopingEnabled()) {
-            self::assertEventSamePropertyUnscoped($event);
+            $property = self::assertEventSamePropertyUnscoped($event);
+
+            self::assertEventCurrency($event, $property);
 
             return;
         }
 
         $owner = self::resolveOwnerOrFail('save signal events');
         $propertyId = (string) $event->tracked_property_id;
-
-        self::findPropertyOrFail($propertyId, $owner);
+        $property = self::findPropertyOrFail($propertyId, $owner);
 
         if ($event->signal_session_id !== null && $event->signal_session_id !== '') {
             $session = self::findOwnedOrFail(SignalSession::class, (string) $event->signal_session_id, $owner);
@@ -72,6 +74,8 @@ final class SignalOwnershipGuard
 
             self::assertSameProperty((string) $identity->tracked_property_id, $propertyId, 'signal_identity_id');
         }
+
+        self::assertEventCurrency($event, $property);
     }
 
     public static function assertSessionWrite(SignalSession $session): void
@@ -113,13 +117,11 @@ final class SignalOwnershipGuard
 
     public static function assertDailyMetricWrite(SignalDailyMetric $metric): void
     {
-        if (! self::ownerScopingEnabled()) {
-            return;
-        }
+        $property = self::ownerScopingEnabled()
+            ? self::findPropertyOrFail((string) $metric->tracked_property_id, self::resolveOwnerOrFail('save signal daily metrics'))
+            : self::findPropertyUnscopedOrFail((string) $metric->tracked_property_id);
 
-        $owner = self::resolveOwnerOrFail('save signal daily metrics');
-
-        self::findPropertyOrFail((string) $metric->tracked_property_id, $owner);
+        self::assertDailyMetricCurrency($metric, $property);
     }
 
     public static function assertInteractionRuleWrite(?string $trackedPropertyId): void
@@ -178,11 +180,11 @@ final class SignalOwnershipGuard
         }
     }
 
-    private static function assertEventSamePropertyUnscoped(SignalEvent $event): void
+    private static function assertEventSamePropertyUnscoped(SignalEvent $event): TrackedProperty
     {
         $propertyId = (string) $event->tracked_property_id;
 
-        self::findPropertyUnscopedOrFail($propertyId);
+        $property = self::findPropertyUnscopedOrFail($propertyId);
 
         if ($event->signal_session_id !== null && $event->signal_session_id !== '') {
             $session = SignalSession::query()->withoutOwnerScope()->whereKey((string) $event->signal_session_id)->first();
@@ -203,6 +205,8 @@ final class SignalOwnershipGuard
 
             self::assertSameProperty((string) $identity->tracked_property_id, $propertyId, 'signal_identity_id');
         }
+
+        return $property;
     }
 
     private static function assertSessionSamePropertyUnscoped(SignalSession $session): void
@@ -243,5 +247,46 @@ final class SignalOwnershipGuard
                 $attribute,
             ));
         }
+    }
+
+    /**
+     * A property has one reporting currency. Events may only carry a
+     * matching nonzero revenue amount; zero-value or missing currencies are
+     * normalized onto the property so every persisted event is explicit.
+     */
+    private static function assertEventCurrency(SignalEvent $event, TrackedProperty $property): void
+    {
+        $propertyCurrency = SignalCurrency::code($property->currency);
+        $eventCurrency = SignalCurrency::normalize($event->currency);
+
+        if ($eventCurrency === null || $eventCurrency === $propertyCurrency || (int) $event->revenue_minor === 0) {
+            $event->currency = $propertyCurrency;
+
+            return;
+        }
+
+        throw new InvalidArgumentException(sprintf(
+            'Signal event revenue in [%s] cannot be recorded on a tracked property reporting in [%s].',
+            $eventCurrency,
+            $propertyCurrency,
+        ));
+    }
+
+    private static function assertDailyMetricCurrency(SignalDailyMetric $metric, TrackedProperty $property): void
+    {
+        $propertyCurrency = SignalCurrency::code($property->currency);
+        $metricCurrency = SignalCurrency::normalize($metric->currency);
+
+        if ($metricCurrency === null || $metricCurrency === $propertyCurrency || (int) $metric->revenue_minor === 0) {
+            $metric->currency = $propertyCurrency;
+
+            return;
+        }
+
+        throw new InvalidArgumentException(sprintf(
+            'Signal daily metric revenue in [%s] cannot be recorded on a tracked property reporting in [%s].',
+            $metricCurrency,
+            $propertyCurrency,
+        ));
     }
 }

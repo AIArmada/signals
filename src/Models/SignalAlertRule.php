@@ -10,6 +10,7 @@ use AIArmada\CommerceSupport\Support\OwnerContext;
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeKey;
+use AIArmada\Signals\Support\SignalCurrency;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -156,6 +157,25 @@ final class SignalAlertRule extends Model implements Auditable
         $this->update(['last_triggered_at' => CarbonImmutable::now()]);
     }
 
+    /**
+     * Currency code the rule's revenue metric is evaluated in.
+     *
+     * Property-scoped rules inherit the property reporting currency.
+     * Global rules must declare the currency through `event_filters.currency`.
+     */
+    public function revenueCurrency(): ?string
+    {
+        if ($this->metric_key !== 'revenue_minor') {
+            return null;
+        }
+
+        if (filled($this->tracked_property_id)) {
+            return SignalCurrency::code($this->trackedProperty?->currency);
+        }
+
+        return SignalCurrency::normalize($this->event_filters['currency'] ?? null);
+    }
+
     public static function ownerScopingEnabled(): bool
     {
         return static::resolveOwnerScopeConfig()->enabled;
@@ -164,6 +184,14 @@ final class SignalAlertRule extends Model implements Auditable
     protected static function booted(): void
     {
         static::saving(function (SignalAlertRule $rule): void {
+            if (
+                $rule->metric_key === 'revenue_minor'
+                && ! filled($rule->tracked_property_id)
+                && SignalCurrency::normalize($rule->event_filters['currency'] ?? null) === null
+            ) {
+                throw new RuntimeException('Revenue alert rules without a tracked property require an explicit currency in event_filters.');
+            }
+
             if (! self::ownerScopingEnabled()) {
                 return;
             }

@@ -51,6 +51,8 @@ Table names can be overridden individually in `database.tables`. All tables defa
 
 `primary_outcome_event_name` controls which event is used for primary-outcome goal calculations. `starter_funnel` is the default funnel definition shown before the user configures a custom one.
 
+`currency` is the reporting currency assigned to tracked properties created without an explicit currency and the fallback used when a currency-less value must be interpreted. Money is always stored as integer minor units plus an uppercase ISO currency code; Signals never converts between currencies and never sums across them implicitly.
+
 ## Request Context Cookies
 
 ```php
@@ -243,6 +245,8 @@ Geolocation capture is available but reverse geocoding is opt-in. When `async` i
 Raw PII such as email, phone, names, and full metadata is excluded by default. Only the keys listed here are stored on `SignalEvent.properties`. Add operational fields that are safe to store; remove any that are sensitive for your use case.
 
 The default allowlist now includes Growth attribution keys such as `experiment_id`, `variant_id`, `assignment_id`, and `experiment_contexts`.
+
+Property filtering is recursive. The blocklist is applied to every nested map and to maps inside lists, so an allowlisted container cannot smuggle a blocked key such as `email`, `phone`, or `metadata`. The allowlist gates top-level keys only; it does not exempt descendants from the blocklist. Traversal is bounded fail-closed at 10 levels and 1000 nodes, and anything past those bounds is dropped instead of persisted. Identity traits use the same filter. Trusted ingestion is unfiltered by design, so server-side callers must not place raw PII in trusted payloads.
 
 ### Alerts
 

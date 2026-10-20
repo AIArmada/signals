@@ -12,9 +12,11 @@ use AIArmada\Signals\Services\SignalsIngestionRequestValidator;
 use AIArmada\Signals\Support\CrossTenantQuery;
 use AIArmada\Signals\Support\DuplicateKeyViolation;
 use AIArmada\Signals\Support\RecordingTransaction;
+use AIArmada\Signals\Support\TransactionFailureClassifier;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\DeadlockException;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -32,41 +34,62 @@ final class IdentifySignalIdentity
     ) {}
 
     /**
+     * Observation time precedence: a valid payload `seen_at` wins, then the
+     * caller-provided observation time (event occurrence for ingestion),
+     * then the current time.
+     *
      * @param  array<string, mixed>  $payload
      */
-    public function handle(TrackedProperty $trackedProperty, array $payload): SignalIdentity
+    public function handle(TrackedProperty $trackedProperty, array $payload, ?CarbonImmutable $observedAt = null): SignalIdentity
     {
-        $identity = $this->resolveIdentity($trackedProperty, $payload);
-        $seenAt = $this->resolveSeenAt($payload);
+        $seenAt = $this->resolveSeenAt($payload, $observedAt);
 
         $traits = $this->propertyFilter->filter(
             is_array($payload['traits'] ?? null) ? $payload['traits'] : null
         );
 
         [$authUserType, $authUserId] = $this->resolveAuthUser();
-
-        $identity->fill([
-            'email' => $payload['email'] ?? $identity->email,
-            'external_id' => $payload['external_id'] ?? $identity->external_id,
-            'anonymous_id' => $payload['anonymous_id'] ?? $identity->anonymous_id,
-            'traits' => $traits ?? $identity->traits,
-            'first_seen_at' => $identity->first_seen_at ?? $seenAt,
-            'last_seen_at' => $seenAt,
-            'auth_user_type' => $authUserType ?? $identity->auth_user_type,
-            'auth_user_id' => $authUserId ?? $identity->auth_user_id,
-        ]);
-
-        if (! $identity->exists) {
-            $identity->tracked_property_id = $trackedProperty->id;
-        }
-
-        $this->syncOwnerFromProperty($identity, $trackedProperty);
         $owner = OwnerContext::fromTypeAndId($trackedProperty->owner_type, $trackedProperty->owner_id);
 
         try {
-            OwnerContext::withOwner($owner, static fn (): bool => (bool) RecordingTransaction::run(static fn (): bool => $identity->save()));
+            return OwnerContext::withOwner($owner, fn (): SignalIdentity => RecordingTransaction::run(function () use (
+                $trackedProperty,
+                $payload,
+                $traits,
+                $seenAt,
+                $authUserType,
+                $authUserId
+            ): SignalIdentity {
+                $identity = $this->resolveIdentity($trackedProperty, $payload);
 
-            return $identity;
+                if ($identity->exists) {
+                    // Locking re-read: the unlocked probe may predate a
+                    // concurrent commit, and the merge must use the latest
+                    // committed bounds. Nested callers own retry when their
+                    // snapshot cannot be rescued.
+                    $locked = SignalIdentity::query()
+                        ->withoutOwnerScope()
+                        ->whereKey($identity->getKey())
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($locked instanceof SignalIdentity) {
+                        $identity = $locked;
+                    }
+                }
+
+                $this->applyObservation($identity, $trackedProperty, $payload, $traits, $seenAt, $authUserType, $authUserId);
+
+                return $identity;
+                // Bounded top-level retries: a repeatable read transaction
+                // racing the same identity row surfaces a serialization
+                // failure; the retry merges onto the committed winner.
+            }, 5));
+        } catch (DeadlockException $e) {
+            // Nested transaction handling replaces the serialization failure
+            // with a wrapper whose code destroys host retry classification;
+            // hand the enclosing transaction the recognized root instead.
+            throw TransactionFailureClassifier::unwrapForHostRetry($e);
         } catch (QueryException $e) {
             if (! DuplicateKeyViolation::is($e) || ($payload['external_id'] ?? null) === null) {
                 throw $e;
@@ -97,18 +120,7 @@ final class IdentifySignalIdentity
                 throw $duplicate;
             }
 
-            $winner->fill([
-                'email' => $payload['email'] ?? $winner->email,
-                'anonymous_id' => $payload['anonymous_id'] ?? $winner->anonymous_id,
-                'traits' => $traits ?? $winner->traits,
-                'first_seen_at' => $winner->first_seen_at ?? $seenAt,
-                'last_seen_at' => $seenAt,
-                'auth_user_type' => $authUserType ?? $winner->auth_user_type,
-                'auth_user_id' => $authUserId ?? $winner->auth_user_id,
-            ]);
-
-            $this->syncOwnerFromProperty($winner, $trackedProperty);
-            $winner->save();
+            $this->applyObservation($winner, $trackedProperty, $payload, $traits, $seenAt, $authUserType, $authUserId);
 
             return $winner;
         }));
@@ -149,6 +161,38 @@ final class IdentifySignalIdentity
 
     /**
      * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>|null  $traits
+     */
+    private function applyObservation(
+        SignalIdentity $identity,
+        TrackedProperty $trackedProperty,
+        array $payload,
+        ?array $traits,
+        CarbonImmutable $seenAt,
+        ?string $authUserType,
+        ?string $authUserId,
+    ): void {
+        $identity->fill([
+            'email' => $payload['email'] ?? $identity->email,
+            'external_id' => $payload['external_id'] ?? $identity->external_id,
+            'anonymous_id' => $payload['anonymous_id'] ?? $identity->anonymous_id,
+            'traits' => $traits ?? $identity->traits,
+            'first_seen_at' => $this->earliestObservation($identity->first_seen_at, $seenAt),
+            'last_seen_at' => $this->latestObservation($identity->last_seen_at, $seenAt),
+            'auth_user_type' => $authUserType ?? $identity->auth_user_type,
+            'auth_user_id' => $authUserId ?? $identity->auth_user_id,
+        ]);
+
+        if (! $identity->exists) {
+            $identity->tracked_property_id = $trackedProperty->id;
+        }
+
+        $this->syncOwnerFromProperty($identity, $trackedProperty);
+        $identity->save();
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
      */
     private function resolveIdentity(TrackedProperty $trackedProperty, array $payload): SignalIdentity
     {
@@ -178,19 +222,37 @@ final class IdentifySignalIdentity
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function resolveSeenAt(array $payload): CarbonImmutable
+    private function resolveSeenAt(array $payload, ?CarbonImmutable $observedAt): CarbonImmutable
     {
         $seenAt = $payload['seen_at'] ?? null;
 
-        if (! is_string($seenAt) || $seenAt === '') {
-            return CarbonImmutable::now();
+        if (is_string($seenAt) && $seenAt !== '') {
+            try {
+                return CarbonImmutable::parse($seenAt);
+            } catch (InvalidFormatException) {
+                // Fall through to the caller-provided observation time.
+            }
         }
 
-        try {
-            return CarbonImmutable::parse($seenAt);
-        } catch (InvalidFormatException) {
-            return CarbonImmutable::now();
+        return $observedAt ?? CarbonImmutable::now();
+    }
+
+    private function earliestObservation(?CarbonImmutable $current, CarbonImmutable $seenAt): CarbonImmutable
+    {
+        if ($current === null || $seenAt->lessThan($current)) {
+            return $seenAt;
         }
+
+        return $current;
+    }
+
+    private function latestObservation(?CarbonImmutable $current, CarbonImmutable $seenAt): CarbonImmutable
+    {
+        if ($current === null || $seenAt->greaterThan($current)) {
+            return $seenAt;
+        }
+
+        return $current;
     }
 
     private function syncOwnerFromProperty(SignalIdentity $identity, TrackedProperty $trackedProperty): void

@@ -6,6 +6,7 @@ namespace AIArmada\Signals\Services;
 
 use AIArmada\Signals\Models\SignalAlertRule;
 use AIArmada\Signals\Models\SignalEvent;
+use AIArmada\Signals\Support\SignalCurrency;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\LazyCollection;
@@ -43,7 +44,7 @@ final class SignalAlertEvaluator
             'events', 'event_count' => (float) $events->count(),
             'page_views' => (float) $events->where('event_category', 'page_view')->count(),
             'conversions' => (float) $events->where('event_category', 'conversion')->count(),
-            'revenue_minor' => (float) $events->sum('revenue_minor'),
+            'revenue_minor' => $this->sumStreamedRevenue($events, $rule->revenueCurrency()),
             'conversion_rate' => $this->calculateConversionRate($events),
             default => $this->calculatePropertyMetric($rule->metric_key, $events),
         };
@@ -70,9 +71,37 @@ final class SignalAlertEvaluator
             'events', 'event_count' => (float) $query->count(),
             'page_views' => (float) (clone $query)->where('event_category', 'page_view')->count(),
             'conversions' => (float) (clone $query)->where('event_category', 'conversion')->count(),
-            'revenue_minor' => (float) $query->sum('revenue_minor'),
+            'revenue_minor' => $this->sumDatabaseRevenue($query, $rule->revenueCurrency()),
             default => $this->calculatePropertyMetric($rule->metric_key, $this->filteredEvents($rule)),
         };
+    }
+
+    /**
+     * @param  Builder<SignalEvent>  $query
+     */
+    private function sumDatabaseRevenue(Builder $query, ?string $currency): float
+    {
+        if ($currency === null) {
+            return 0.0;
+        }
+
+        return (float) $query
+            ->whereRaw('UPPER(currency) = ?', [$currency])
+            ->sum('revenue_minor');
+    }
+
+    /**
+     * @param  LazyCollection<int, SignalEvent>  $events
+     */
+    private function sumStreamedRevenue(LazyCollection $events, ?string $currency): float
+    {
+        if ($currency === null) {
+            return 0.0;
+        }
+
+        return (float) $events
+            ->filter(fn (SignalEvent $event): bool => SignalCurrency::matches($event->currency, $currency))
+            ->sum('revenue_minor');
     }
 
     private function hasPropertyFilters(SignalAlertRule $rule): bool

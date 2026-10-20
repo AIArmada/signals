@@ -76,6 +76,12 @@ php artisan signals:aggregate-daily --days=2
 ```
 
 - Ensure scheduler is running in production.
+- Daily metrics are stamped with the tracked property's reporting currency and only sum event revenue in that currency. Legacy foreign-currency rows contribute zero instead of inflating the property total; fix the source events rather than converting the rollups.
+
+## Trusted Revenue Rejected For A Foreign Currency
+
+- A trusted event with a nonzero `revenue_minor` must use the tracked property's reporting currency. A mismatched `currency` throws `InvalidArgumentException` before identity, session, or event rows are written.
+- Zero-value events and payloads without `currency` adopt the property currency, and stored codes are uppercased. There is no FX conversion or cross-currency fallback.
 
 ## Child Writes Fail With an Authorization Error
 
@@ -98,6 +104,7 @@ php artisan signals:process-alerts --dry-run
 ```
 
 - Check `is_active`, threshold values, and cooldown windows on `SignalAlertRule`.
+- Revenue rules are currency-explicit. A property-scoped rule uses the property currency; a global revenue rule must set `event_filters.currency` and is rejected on save without it. A legacy rule with no resolvable currency evaluates to `0.0`, and events with a missing or different currency never match.
 - If you expected alerts during ingest, confirm `signals.features.alerts.evaluate_on_ingest.enabled` is turned on. On-ingest alert effects run after the outermost transaction commits; if the outer transaction rolls back, no alert job or log escapes.
 - Final delivery failures lock the delivery row inside a transaction and leave `sent` and `dead` rows terminal. Send success and transport-error completion use the same locked reread: a completion that arrives after a terminal transition, or after a newer claim took over, is dropped instead of regressing the row.
 - Never mix `sent_at` and `dead_at` on one delivery: exactly one terminal timestamp is ever set. If both appear, the send raced a final failure on an older build; current builds finalize under a row lock.

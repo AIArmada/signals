@@ -22,6 +22,29 @@ Signals ships dedicated services for:
 
 These services all operate on the same owner-scoped Signals data and can be reused outside Filament.
 
+## Currency-explicit reporting
+
+Revenue is always reported with its currency. Reports never convert or sum across currencies implicitly:
+
+- A single-property scope returns `revenue_minor` plus the property's uppercase `currency` code (for example `['revenue_minor' => 129900, 'currency' => 'MYR']`).
+- A multi-property scope returns a `revenue` map keyed by uppercase currency code, with totals sorted by code (for example `['revenue' => ['MYR' => 129900, 'USD' => 5000]]`).
+
+The same shape applies to dashboard summaries and trends, report summaries and rows, funnel stages, and goal rows. Funnel revenue is attributed to the final stage only, using the matched event's own currency. Acquisition and content tables aggregate event revenue only when the event currency matches its property's reporting currency, so legacy foreign-currency rows contribute zero.
+
+Custom reports can reuse the shared shaping helpers instead of implementing currency rules themselves:
+
+```php
+use AIArmada\Signals\Support\SignalReportRevenue;
+
+$summary = [
+    'events' => 42,
+    ...SignalReportRevenue::shape($trackedPropertyId, $revenueByCurrency),
+];
+
+// Group a filtered event query by uppercase currency.
+$revenueByCurrency = SignalReportRevenue::byCurrency($query);
+```
+
 ## Saved reports and segments
 
 - `SavedSignalReport` stores reusable report state for supported report types
@@ -62,6 +85,8 @@ Alert rules can filter by:
 - event property conditions.
 
 This is intentionally package-agnostic: cart, checkout, orders, vouchers, affiliates, and future packages can all use the same rule engine.
+
+Revenue alert rules are currency-explicit. A rule scoped to a tracked property evaluates in that property's reporting currency. A global revenue rule must set `event_filters.currency`; the model rejects a new revenue rule without one. Events whose currency is missing or different never match a revenue rule, and a legacy revenue rule with no resolvable currency evaluates to `0.0` instead of guessing.
 
 ## Channels
 

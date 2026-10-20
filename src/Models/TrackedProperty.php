@@ -9,12 +9,14 @@ use AIArmada\CommerceSupport\Concerns\LogsCommerceActivity;
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeKey;
+use AIArmada\Signals\Support\SignalCurrency;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use OwenIt\Auditing\Contracts\Auditable;
 
 /**
@@ -177,11 +179,19 @@ final class TrackedProperty extends Model implements Auditable
     protected static function booted(): void
     {
         static::creating(function (TrackedProperty $trackedProperty): void {
+            $trackedProperty->currency = SignalCurrency::code($trackedProperty->currency);
+
             if (is_string($trackedProperty->write_key ?? null) && $trackedProperty->write_key !== '') {
                 return;
             }
 
             $trackedProperty->write_key = Str::random(40);
+        });
+
+        static::updating(function (TrackedProperty $trackedProperty): void {
+            if ($trackedProperty->isDirty('currency')) {
+                throw new InvalidArgumentException('The tracked property reporting currency is immutable once created.');
+            }
         });
 
         static::deleting(function (TrackedProperty $trackedProperty): void {

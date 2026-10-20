@@ -21,12 +21,14 @@ use AIArmada\Signals\Services\SignalsIngestionRequestValidator;
 use AIArmada\Signals\Support\CrossTenantQuery;
 use AIArmada\Signals\Support\DuplicateKeyViolation;
 use AIArmada\Signals\Support\RecordingTransaction;
+use AIArmada\Signals\Support\SignalCurrency;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Throwable;
 
@@ -53,6 +55,20 @@ final class IngestSignalEvent implements SignalEventIngestor
         $idempotencyKey = $this->stringValue($payload['idempotency_key'] ?? null)
             ?? ($trusted ? $sourceEventId : null);
 
+        $revenueMinor = $trusted ? $this->normalizeRevenueMinor($payload['revenue_minor'] ?? 0) : 0;
+        $propertyCurrency = SignalCurrency::code($trackedProperty->currency);
+        $payloadCurrency = $trusted ? SignalCurrency::normalize($payload['currency'] ?? null) : null;
+
+        if ($payloadCurrency !== null && $payloadCurrency !== $propertyCurrency && $revenueMinor > 0) {
+            throw new InvalidArgumentException(sprintf(
+                'Cannot record [%s] revenue on a tracked property reporting in [%s].',
+                $payloadCurrency,
+                $propertyCurrency,
+            ));
+        }
+
+        $currency = $propertyCurrency;
+
         if ($idempotencyKey !== null) {
             $existing = CrossTenantQuery::findExistingEvent($trackedProperty, $ingestionSource, $idempotencyKey);
 
@@ -65,10 +81,6 @@ final class IngestSignalEvent implements SignalEventIngestor
         $rawProperties = is_array($payload['properties'] ?? null) ? $payload['properties'] : null;
         $properties = $trusted ? $rawProperties : $this->filterProperties($rawProperties);
         $propertyTypes = $this->propertyTypeInferrer->infer($properties);
-        $revenueMinor = $trusted ? $this->normalizeRevenueMinor($payload['revenue_minor'] ?? 0) : 0;
-        $currency = $trusted
-            ? (string) ($payload['currency'] ?? $trackedProperty->currency)
-            : (string) $trackedProperty->currency;
 
         try {
             $event = $this->withTrackedPropertyOwner($trackedProperty, fn (): SignalEvent => RecordingTransaction::run(function () use (
@@ -83,7 +95,7 @@ final class IngestSignalEvent implements SignalEventIngestor
                 $revenueMinor,
                 $currency
             ): SignalEvent {
-                $identity = $this->resolveIdentity($trackedProperty, $payload);
+                $identity = $this->resolveIdentity($trackedProperty, $payload, $occurredAt);
                 $session = $this->resolveSession->handle($trackedProperty, $identity, $payload);
 
                 $event = new SignalEvent([
@@ -224,13 +236,13 @@ final class IngestSignalEvent implements SignalEventIngestor
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function resolveIdentity(TrackedProperty $trackedProperty, array $payload): ?SignalIdentity
+    private function resolveIdentity(TrackedProperty $trackedProperty, array $payload, CarbonImmutable $observedAt): ?SignalIdentity
     {
         if (($payload['external_id'] ?? null) === null && ($payload['anonymous_id'] ?? null) === null) {
             return null;
         }
 
-        return app(IdentifySignalIdentity::class)->handle($trackedProperty, $payload);
+        return app(IdentifySignalIdentity::class)->handle($trackedProperty, $payload, $observedAt);
     }
 
     private function resolveOccurredAt(array $payload): CarbonImmutable

@@ -7,6 +7,8 @@ namespace AIArmada\Signals\Services;
 use AIArmada\Signals\Models\SignalEvent;
 use AIArmada\Signals\Models\SignalGoal;
 use AIArmada\Signals\Models\TrackedProperty;
+use AIArmada\Signals\Support\SignalCurrency;
+use AIArmada\Signals\Support\SignalReportRevenue;
 use Illuminate\Database\Eloquent\Builder;
 
 final class GoalsReportService
@@ -17,23 +19,39 @@ final class GoalsReportService
     ) {}
 
     /**
-     * @return array{goals:int,goal_hits:int,visitors:int,revenue_minor:int,avg_goal_rate:float}
+     * @return array{goals:int,goal_hits:int,visitors:int,avg_goal_rate:float,revenue_minor?:int,currency?:string,revenue?:array<string, int>}
      */
     public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null): array
     {
         $rows = $this->rows($trackedPropertyId, $from, $until, $signalSegmentId);
+        $revenue = [];
+
+        foreach ($rows as $row) {
+            if (is_array($row['revenue'] ?? null)) {
+                foreach ($row['revenue'] as $currency => $amount) {
+                    $revenue[$currency] = ($revenue[$currency] ?? 0) + (int) $amount;
+                }
+
+                continue;
+            }
+
+            $currency = $row['currency'] ?? SignalCurrency::default();
+            $revenue[$currency] = ($revenue[$currency] ?? 0) + (int) ($row['revenue_minor'] ?? 0);
+        }
+
+        ksort($revenue);
 
         return [
             'goals' => count($rows),
             'goal_hits' => array_sum(array_column($rows, 'goal_hits')),
             'visitors' => array_sum(array_column($rows, 'visitors')),
-            'revenue_minor' => array_sum(array_column($rows, 'revenue_minor')),
             'avg_goal_rate' => round(count($rows) > 0 ? array_sum(array_column($rows, 'goal_rate')) / count($rows) : 0, 2),
+            ...SignalReportRevenue::shape($trackedPropertyId, $revenue),
         ];
     }
 
     /**
-     * @return list<array{id:string,name:string,goal_type:string,event_name:string,event_category:?string,tracked_property_name:?string,goal_hits:int,visitors:int,revenue_minor:int,goal_rate:float,last_hit_at:?string}>
+     * @return list<array{id:string,name:string,goal_type:string,event_name:string,event_category:?string,tracked_property_name:?string,goal_hits:int,visitors:int,goal_rate:float,last_hit_at:?string,revenue_minor?:int,currency?:string,revenue?:array<string, int>}>
      */
     public function rows(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null): array
     {
@@ -50,6 +68,9 @@ final class GoalsReportService
                 $query = $this->goalEventQuery($goal, $from, $until, $signalSegmentId);
                 $goalHits = (int) (clone $query)->count();
                 $visitors = $this->distinctActorCount(clone $query);
+                $propertyCurrency = filled($goal->tracked_property_id)
+                    ? SignalCurrency::code($goal->trackedProperty?->currency)
+                    : null;
 
                 return [
                     'id' => $goal->id,
@@ -60,7 +81,7 @@ final class GoalsReportService
                     'tracked_property_name' => $goal->trackedProperty?->name,
                     'goal_hits' => $goalHits,
                     'visitors' => $visitors,
-                    'revenue_minor' => (int) (clone $query)->sum('revenue_minor'),
+                    ...SignalReportRevenue::shape($goal->tracked_property_id, SignalReportRevenue::byCurrency(clone $query), $propertyCurrency),
                     'goal_rate' => $visitors > 0 ? round(($goalHits / $visitors) * 100, 2) : 0.0,
                     'last_hit_at' => (clone $query)->max('occurred_at'),
                 ];

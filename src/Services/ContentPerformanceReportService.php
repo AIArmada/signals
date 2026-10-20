@@ -7,6 +7,8 @@ namespace AIArmada\Signals\Services;
 use AIArmada\Signals\Models\SavedSignalReport;
 use AIArmada\Signals\Models\SignalEvent;
 use AIArmada\Signals\Models\TrackedProperty;
+use AIArmada\Signals\Support\SignalCurrency;
+use AIArmada\Signals\Support\SignalReportRevenue;
 use Illuminate\Database\Eloquent\Builder;
 
 final class ContentPerformanceReportService
@@ -14,18 +16,25 @@ final class ContentPerformanceReportService
     public function __construct(private readonly SignalSegmentReportFilter $segmentReportFilter) {}
 
     /**
-     * @return array{paths:int,views:int,conversions:int,revenue_minor:int,avg_conversion_rate:float}
+     * @return array{paths:int,views:int,conversions:int,avg_conversion_rate:float,revenue_minor?:int,currency?:string,revenue?:array<string, int>}
      */
     public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null, ?string $savedReportId = null): array
     {
         $rows = $this->rows($trackedPropertyId, $from, $until, $signalSegmentId, $savedReportId);
+        $revenue = [];
+
+        foreach ($rows as $row) {
+            $revenue[$row['currency']] = ($revenue[$row['currency']] ?? 0) + $row['revenue_minor'];
+        }
+
+        ksort($revenue);
 
         return [
             'paths' => count($rows),
             'views' => array_sum(array_column($rows, 'views')),
             'conversions' => array_sum(array_column($rows, 'conversions')),
-            'revenue_minor' => array_sum(array_column($rows, 'revenue_minor')),
             'avg_conversion_rate' => round(count($rows) > 0 ? array_sum(array_column($rows, 'conversion_rate')) / count($rows) : 0, 2),
+            ...SignalReportRevenue::shape($this->resolvePropertyId($trackedPropertyId, $savedReportId), $revenue),
         ];
     }
 
@@ -46,7 +55,7 @@ final class ContentPerformanceReportService
             ->selectRaw($this->breakdownValueExpression($dimension) . ' as content_breakdown_value')
             ->selectRaw("SUM(CASE WHEN event_category = 'page_view' THEN 1 ELSE 0 END) as views")
             ->selectRaw("SUM(CASE WHEN event_category = 'conversion' THEN 1 ELSE 0 END) as conversions")
-            ->selectRaw('SUM(revenue_minor) as revenue_minor')
+            ->selectRaw(SignalReportRevenue::conditionalRevenueExpression() . ' as revenue_minor')
             ->selectRaw('COUNT(DISTINCT COALESCE(signal_identity_id, signal_session_id, id)) as visitors')
             ->selectRaw('MAX(occurred_at) as last_seen_at')
             ->with('trackedProperty')
@@ -56,7 +65,7 @@ final class ContentPerformanceReportService
     }
 
     /**
-     * @return list<array{tracked_property_id:string,content_path:string,views:int,conversions:int,revenue_minor:int,visitors:int,conversion_rate:float}>
+     * @return list<array{tracked_property_id:string,content_path:string,views:int,conversions:int,revenue_minor:int,currency:string,visitors:int,conversion_rate:float}>
      */
     public function rows(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null, ?string $savedReportId = null): array
     {
@@ -72,6 +81,7 @@ final class ContentPerformanceReportService
                     'views' => $views,
                     'conversions' => $conversions,
                     'revenue_minor' => (int) ($row->revenue_minor ?? 0),
+                    'currency' => SignalCurrency::code($row->trackedProperty?->currency),
                     'visitors' => (int) ($row->visitors ?? 0),
                     'conversion_rate' => $views > 0 ? round(($conversions / $views) * 100, 2) : 0.0,
                 ];
@@ -164,6 +174,15 @@ final class ContentPerformanceReportService
             ->where('is_active', true)
             ->whereKey($savedReportId)
             ->first();
+    }
+
+    private function resolvePropertyId(?string $trackedPropertyId, ?string $savedReportId): ?string
+    {
+        if ($trackedPropertyId !== null && $trackedPropertyId !== '') {
+            return $trackedPropertyId;
+        }
+
+        return $this->resolveSavedReport($savedReportId)?->tracked_property_id;
     }
 
     private function breakdownValueExpression(string $dimension): string

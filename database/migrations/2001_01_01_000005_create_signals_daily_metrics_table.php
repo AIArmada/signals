@@ -22,6 +22,7 @@ return new class extends Migration
             $table->unsignedInteger('events')->default(0);
             $table->unsignedInteger('conversions')->default(0);
             $table->unsignedBigInteger('revenue_minor')->default(0);
+            $table->string('currency', 3)->default(config('signals.defaults.currency', 'MYR'));
             $table->timestampsTz();
 
             $table->unique(['tracked_property_id', 'date']);

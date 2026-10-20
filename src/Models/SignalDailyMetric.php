@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $events
  * @property int $conversions
  * @property int $revenue_minor
+ * @property string $currency
  * @property-read TrackedProperty $trackedProperty
  */
 final class SignalDailyMetric extends Model
@@ -45,6 +46,7 @@ final class SignalDailyMetric extends Model
         'events',
         'conversions',
         'revenue_minor',
+        'currency',
         'owner_type',
         'owner_id',
     ];

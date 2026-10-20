@@ -8,6 +8,7 @@ use AIArmada\Signals\Models\SignalDailyMetric;
 use AIArmada\Signals\Models\SignalEvent;
 use AIArmada\Signals\Models\SignalSession;
 use AIArmada\Signals\Models\TrackedProperty;
+use AIArmada\Signals\Support\SignalCurrency;
 use Illuminate\Support\Carbon;
 
 final class SignalMetricsAggregator
@@ -16,6 +17,7 @@ final class SignalMetricsAggregator
     {
         $start = $date->copy()->startOfDay();
         $end = $date->copy()->endOfDay();
+        $propertyCurrency = SignalCurrency::code($trackedProperty->currency);
 
         $events = SignalEvent::query()
             ->forOwner()
@@ -31,7 +33,7 @@ final class SignalMetricsAggregator
             ->selectRaw('COUNT(*) as events')
             ->selectRaw("SUM(CASE WHEN event_category = 'page_view' THEN 1 ELSE 0 END) as page_views")
             ->selectRaw("SUM(CASE WHEN event_category = 'conversion' THEN 1 ELSE 0 END) as conversions")
-            ->selectRaw('COALESCE(SUM(revenue_minor), 0) as revenue_minor')
+            ->selectRaw('COALESCE(SUM(CASE WHEN UPPER(currency) = ? THEN revenue_minor ELSE 0 END), 0) as revenue_minor', [$propertyCurrency])
             ->selectRaw('COUNT(DISTINCT signal_identity_id) as unique_identities')
             ->toBase()
             ->first();
@@ -57,6 +59,7 @@ final class SignalMetricsAggregator
                 'events' => (int) ($eventMetrics->events ?? 0),
                 'conversions' => (int) ($eventMetrics->conversions ?? 0),
                 'revenue_minor' => (int) ($eventMetrics->revenue_minor ?? 0),
+                'currency' => $propertyCurrency,
             ],
         );
     }
@@ -81,10 +84,10 @@ final class SignalMetricsAggregator
     }
 
     /**
-     * Aggregate a date for a property chunk with one event and one session
-     * aggregate query instead of repeating both scans for every property.
-     * Daily metric models are still persisted through updateOrCreate so their
-     * normal model lifecycle remains intact.
+     * Aggregate a date for a property chunk with one event, one session, and
+     * one revenue-per-currency query instead of repeating the scans for every
+     * property. Daily metric models are still persisted through updateOrCreate
+     * so their normal model lifecycle remains intact.
      */
     private function aggregateDateForProperties(Carbon $date, mixed $properties): void
     {
@@ -100,11 +103,22 @@ final class SignalMetricsAggregator
             ->selectRaw('COUNT(*) as events')
             ->selectRaw("SUM(CASE WHEN event_category = 'page_view' THEN 1 ELSE 0 END) as page_views")
             ->selectRaw("SUM(CASE WHEN event_category = 'conversion' THEN 1 ELSE 0 END) as conversions")
-            ->selectRaw('COALESCE(SUM(revenue_minor), 0) as revenue_minor')
             ->selectRaw('COUNT(DISTINCT signal_identity_id) as unique_identities')
             ->groupBy('tracked_property_id')
             ->get()
             ->keyBy('tracked_property_id');
+
+        $revenueMetrics = SignalEvent::query()
+            ->forOwner()
+            ->whereIn('tracked_property_id', $propertyIds)
+            ->whereBetween('occurred_at', [$start, $end])
+            ->select('tracked_property_id')
+            ->selectRaw('UPPER(currency) as currency')
+            ->selectRaw('COALESCE(SUM(revenue_minor), 0) as revenue_minor')
+            ->groupBy('tracked_property_id')
+            ->groupByRaw('UPPER(currency)')
+            ->get()
+            ->groupBy('tracked_property_id');
 
         $sessionMetrics = SignalSession::query()
             ->forOwner()
@@ -120,6 +134,9 @@ final class SignalMetricsAggregator
         foreach ($properties as $trackedProperty) {
             $eventMetric = $eventMetrics->get($trackedProperty->id);
             $sessionMetric = $sessionMetrics->get($trackedProperty->id);
+            $propertyCurrency = SignalCurrency::code($trackedProperty->currency);
+            $revenueMetric = ($revenueMetrics->get($trackedProperty->id) ?? collect())
+                ->first(fn ($row): bool => SignalCurrency::normalize($row->currency) === $propertyCurrency);
 
             SignalDailyMetric::query()->forOwner()->updateOrCreate(
                 [
@@ -135,7 +152,8 @@ final class SignalMetricsAggregator
                     'page_views' => (int) ($eventMetric->page_views ?? 0),
                     'events' => (int) ($eventMetric->events ?? 0),
                     'conversions' => (int) ($eventMetric->conversions ?? 0),
-                    'revenue_minor' => (int) ($eventMetric->revenue_minor ?? 0),
+                    'revenue_minor' => (int) ($revenueMetric->revenue_minor ?? 0),
+                    'currency' => $propertyCurrency,
                 ],
             );
         }

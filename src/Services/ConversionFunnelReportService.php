@@ -8,6 +8,8 @@ use AIArmada\Signals\Models\SavedSignalReport;
 use AIArmada\Signals\Models\SignalEvent;
 use AIArmada\Signals\Models\SignalGoal;
 use AIArmada\Signals\Models\TrackedProperty;
+use AIArmada\Signals\Support\SignalCurrency;
+use AIArmada\Signals\Support\SignalReportRevenue;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -20,7 +22,7 @@ final class ConversionFunnelReportService
     ) {}
 
     /**
-     * @return array{started:int,completed:int,paid:int,started_label:string,completed_label:string,paid_label:string,start_to_complete_rate:float,complete_to_paid_rate:float,overall_rate:float,start_drop_off:int,complete_drop_off:int,revenue_minor:int}
+     * @return array{started:int,completed:int,paid:int,started_label:string,completed_label:string,paid_label:string,start_to_complete_rate:float,complete_to_paid_rate:float,overall_rate:float,start_drop_off:int,complete_drop_off:int,revenue_minor?:int,currency?:string,revenue?:array<string, int>}
      */
     public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null, ?string $savedReportId = null): array
     {
@@ -40,7 +42,7 @@ final class ConversionFunnelReportService
                 'overall_rate' => 0.0,
                 'start_drop_off' => 0,
                 'complete_drop_off' => 0,
-                'revenue_minor' => 0,
+                ...SignalReportRevenue::shape($context['tracked_property_id'], []),
             ];
         }
 
@@ -65,12 +67,12 @@ final class ConversionFunnelReportService
             'overall_rate' => $this->rate($paid, $started),
             'start_drop_off' => max($started - $secondStage['count'], 0),
             'complete_drop_off' => max($completed - $paid, 0),
-            'revenue_minor' => $finalStage['revenue_minor'],
+            ...SignalReportRevenue::shape($context['tracked_property_id'], $this->stageRevenueMap($finalStage), $finalStage['currency'] ?? null),
         ];
     }
 
     /**
-     * @return list<array{label:string,event_name:string,count:int,rate_from_previous:float,rate_from_start:float,drop_off:int,revenue_minor:int}>
+     * @return list<array{label:string,event_name:string,count:int,rate_from_previous:float,rate_from_start:float,drop_off:int,revenue_minor?:int,currency?:string,revenue?:array<string, int>}>
      */
     public function stages(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null, ?string $savedReportId = null): array
     {
@@ -105,7 +107,7 @@ final class ConversionFunnelReportService
     }
 
     /**
-     * @return list<array{label:string,event_name:string,count:int,rate_from_previous:float,rate_from_start:float,drop_off:int,revenue_minor:int}>
+     * @return list<array{label:string,event_name:string,count:int,rate_from_previous:float,rate_from_start:float,drop_off:int,revenue_minor?:int,currency?:string,revenue?:array<string, int>}>
      */
     private function buildStages(?string $trackedPropertyId, ?string $from, ?string $until, ?string $signalSegmentId, ?SavedSignalReport $savedReport): array
     {
@@ -116,6 +118,7 @@ final class ConversionFunnelReportService
         }
 
         $progress = $this->calculateStageProgress($trackedPropertyId, $from, $until, $signalSegmentId, $steps, $savedReport);
+        $propertyCurrency = filled($trackedPropertyId) ? SignalReportRevenue::propertyCurrency($trackedPropertyId) : null;
 
         $entryCount = null;
         $previousCount = null;
@@ -125,6 +128,8 @@ final class ConversionFunnelReportService
             $count = $progress[$index]['count'] ?? 0;
             $entryCount ??= $count;
             $nextCount = $progress[$index + 1]['count'] ?? null;
+            $revenue = $progress[$index]['revenue'] ?? [];
+            ksort($revenue);
 
             $stages[] = [
                 'label' => $step['label'],
@@ -133,13 +138,28 @@ final class ConversionFunnelReportService
                 'rate_from_previous' => $previousCount === null ? 100.0 : $this->rate($count, $previousCount),
                 'rate_from_start' => $this->rate($count, $entryCount),
                 'drop_off' => $nextCount === null ? 0 : max($count - $nextCount, 0),
-                'revenue_minor' => $progress[$index]['revenue_minor'] ?? 0,
+                ...SignalReportRevenue::shape($trackedPropertyId, $revenue, $propertyCurrency),
             ];
 
             $previousCount = $count;
         }
 
         return $stages;
+    }
+
+    /**
+     * @param  array{revenue_minor?:int,currency?:string,revenue?:array<string, int>}  $stage
+     * @return array<string, int>
+     */
+    private function stageRevenueMap(array $stage): array
+    {
+        if (is_array($stage['revenue'] ?? null)) {
+            return $stage['revenue'];
+        }
+
+        $currency = $stage['currency'] ?? SignalCurrency::default();
+
+        return [$currency => (int) ($stage['revenue_minor'] ?? 0)];
     }
 
     /**
@@ -161,13 +181,13 @@ final class ConversionFunnelReportService
 
     /**
      * @param  list<array{label:string,event_name:string,event_category:string|null,condition_match_type:string,conditions:array<int, array<string, mixed>>|null}>  $steps
-     * @return list<array{count:int,revenue_minor:int}>
+     * @return list<array{count:int,revenue:array<string, int>}>
      */
     private function calculateStageProgress(?string $trackedPropertyId, ?string $from, ?string $until, ?string $signalSegmentId, array $steps, ?SavedSignalReport $savedReport): array
     {
         $stepWindowMinutes = SavedSignalReportDefinition::stepWindowMinutes($savedReport?->normalizedSettings());
         $counts = array_fill(0, count($steps), 0);
-        $revenues = array_fill(0, count($steps), 0);
+        $revenues = array_fill(0, count($steps), []);
 
         [$from, $until] = $this->resolveBounds($from, $until);
 
@@ -182,9 +202,9 @@ final class ConversionFunnelReportService
         }
 
         return array_map(
-            static fn (int $count, int $revenueMinor): array => [
+            static fn (int $count, array $revenue): array => [
                 'count' => $count,
-                'revenue_minor' => $revenueMinor,
+                'revenue' => $revenue,
             ],
             $counts,
             $revenues,
@@ -195,7 +215,7 @@ final class ConversionFunnelReportService
      * @param  list<SignalEvent>  $actorEvents
      * @param  list<array{label:string,event_name:string,event_category:string|null,condition_match_type:string,conditions:array<int, array<string, mixed>>|null}>  $steps
      * @param  array<int, int>  $counts
-     * @param  array<int, int>  $revenues
+     * @param  array<int, array<string, int>>  $revenues
      */
     private function applyActorProgression(array $actorEvents, array $steps, ?int $stepWindowMinutes, array &$counts, array &$revenues): void
     {
@@ -230,9 +250,12 @@ final class ConversionFunnelReportService
             }
 
             $counts[$stageIndex]++;
-            $revenues[$stageIndex] += $stageIndex === array_key_last($steps)
-                ? (int) $matchedEvent->revenue_minor
-                : 0;
+
+            if ($stageIndex === array_key_last($steps)) {
+                $currency = SignalCurrency::code($matchedEvent->currency);
+                $revenues[$stageIndex][$currency] = ($revenues[$stageIndex][$currency] ?? 0) + (int) $matchedEvent->revenue_minor;
+            }
+
             $previousMatchedAt = $matchedEvent->occurred_at;
         }
     }

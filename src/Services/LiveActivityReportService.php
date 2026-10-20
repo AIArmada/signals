@@ -6,6 +6,7 @@ namespace AIArmada\Signals\Services;
 
 use AIArmada\Signals\Models\SignalEvent;
 use AIArmada\Signals\Models\TrackedProperty;
+use AIArmada\Signals\Support\SignalReportRevenue;
 use Illuminate\Database\Eloquent\Builder;
 
 final class LiveActivityReportService
@@ -13,7 +14,7 @@ final class LiveActivityReportService
     public function __construct(private readonly SignalSegmentReportFilter $segmentReportFilter) {}
 
     /**
-     * @return array{events:int,page_views:int,conversions:int,revenue_minor:int}
+     * @return array{events:int,page_views:int,conversions:int,revenue_minor?:int,currency?:string,revenue?:array<string, int>}
      */
     public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null): array
     {
@@ -23,7 +24,7 @@ final class LiveActivityReportService
             'events' => (int) (clone $query)->count(),
             'page_views' => (int) (clone $query)->where('event_category', 'page_view')->count(),
             'conversions' => (int) (clone $query)->where('event_category', 'conversion')->count(),
-            'revenue_minor' => (int) (clone $query)->sum('revenue_minor'),
+            ...SignalReportRevenue::shape($trackedPropertyId, SignalReportRevenue::byCurrency(clone $query)),
         ];
     }
 

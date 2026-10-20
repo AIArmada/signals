@@ -26,7 +26,7 @@ Base path is `signals.http.prefix` (default `api/signals`).
 
 When `auth_tracking` is enabled the currently authenticated Laravel user is automatically linked. Auth linkage is never accepted from the payload itself.
 
-Traits pass through the same property allowlist and PII blocklist as event properties, so only allowlisted, non-blocked keys are persisted:
+Traits pass through the same property allowlist and PII blocklist as event properties, so only allowlisted, non-blocked keys are persisted. Filtering is recursive: blocked keys are removed from nested maps and from maps inside lists even when their parent key is allowlisted, and traversal stops at 10 levels or 1000 nodes.
 
 ### Page View
 
@@ -89,7 +89,7 @@ Optional device fields can be passed explicitly. When `ua_parsing` is enabled th
 }
 ```
 
-The browser route is deliberately non-financial. It enforces a configurable event allowlist, bounded payload size/depth/key counts, and rate limiting by write key plus client address. Revenue, currency, order/conversion/transaction identifiers, and source event IDs are rejected. Retries may pass an optional client `idempotency_key`; repeated submissions with the same key return the original event instead of duplicating it. `Origin`, `Referer`, and the page URL are domain-policy signals only; they are not authentication.
+The browser route is deliberately non-financial. It enforces a configurable event allowlist, bounded payload size/depth/key counts, and rate limiting by write key plus client address. Revenue, currency, order/conversion/transaction identifiers, and source event IDs are rejected. Browser revenue is always recorded as `0` in the property currency. Retries may pass an optional client `idempotency_key`; repeated submissions with the same key return the original event instead of duplicating it. `Origin`, `Referer`, and the page URL are domain-policy signals only; they are not authentication.
 
 Idempotency keys live in per-boundary namespaces. Every event stores an `ingestion_source` of `browser` or `trusted`, derived from the ingestion path (never from browser input), and the uniqueness scope is `(tracked_property_id, ingestion_source, idempotency_key)`. The same raw key submitted on both the browser route and the trusted route (or trusted recorders) therefore creates two distinct events, while retries within one boundary keep deduplicating. Deduplication is checked before identity and session writes, so retries do not create new side effects.
 
@@ -115,6 +115,8 @@ Server outcomes require `X-Signals-Timestamp` and `X-Signals-Signature` headers.
   }
 }
 ```
+
+`revenue_minor` is integer minor units. A trusted event can only record revenue in the tracked property's reporting currency: a nonzero amount with a `currency` that differs from the property currency is rejected before any identity, session, or event row is written. A zero-value event, or an omitted `currency`, adopts the property currency, and stored codes are uppercased. There is no FX conversion.
 
 ## Campaign Attribution
 
@@ -309,7 +311,7 @@ $recorder->recordLinkClicked($link, $click);
 The `signals.recording.events.*` toggles let you disable selected built-in recorder outputs without removing the surrounding integration. Keys are literal dotted event names (`checkout.started`, `checkout.completed`, `order.paid`, `order.refunded`); set a key to `false` to suppress that transition.
 
 > **warning**
-> Recognized revenue semantics changed. Built-in order revenue is recorded by `order.paid` using the actual paid amount from the order event; the full order total stays in the `order_total_minor` property and the actual payment amount stays in the `paid_amount_minor` property. `checkout.started` and `checkout.completed` keep the cart/order value in the `total_minor` property but record `revenue_minor: 0`, so abandoned checkouts no longer inflate revenue. `order.refunded` records `revenue_minor: 0` with the refunded amount in `refund_amount_minor`; affiliate conversions record `revenue_minor: 0` with `value_minor` / `commission_minor` properties; cart snapshot events record `revenue_minor: 0` with `cart_total_minor`. Explicit signed trusted outcomes (`server-outcome`) can still record revenue directly. There is no currency conversion, no net-revenue backfill, and no legacy fallback: update any dashboards or alerts that summed checkout or refund `revenue_minor`.
+> Recognized revenue semantics changed. Built-in order revenue is recorded by `order.paid` using the actual paid amount from the order event; the full order total stays in the `order_total_minor` property and the actual payment amount stays in the `paid_amount_minor` property. `checkout.started` and `checkout.completed` keep the cart/order value in the `total_minor` property but record `revenue_minor: 0`, so abandoned checkouts no longer inflate revenue. `order.refunded` records `revenue_minor: 0` with the refunded amount in `refund_amount_minor`; affiliate conversions record `revenue_minor: 0` with `value_minor` / `commission_minor` properties; cart snapshot events record `revenue_minor: 0` with `cart_total_minor`. Explicit signed trusted outcomes (`server-outcome`) can still record revenue directly. Revenue remains scoped to the property's reporting currency: a trusted nonzero amount in a different currency is rejected rather than converted. There is no currency conversion, no net-revenue backfill, and no legacy fallback: update any dashboards or alerts that summed checkout or refund `revenue_minor`.
 
 Built-in recorders emit stable idempotency keys for one-time lifecycle transitions so listener retries do not duplicate them: checkout keys derive from the session id plus transition (`started` / `completed`); `order.paid` keys are `order-paid:` plus a SHA-256 hash of the JSON-encoded `[order id, gateway, transaction id]` tuple (all required, no timestamp fallback); `order.refunded` keys are `order-refunded:` plus a SHA-256 hash of the JSON-encoded `[order id, refund id]` tuple (required, no amount/reason/date fallback). Hashing keeps keys within the 255-character column for max-length gateway and transaction ids and avoids delimiter collisions; the raw transaction or refund id stays in `source_event_id` and the event properties. Affiliate conversion and link click keys derive from their stable source ids, as do the opt-in affiliate lifecycle outputs (`affiliate-created:`, `affiliate-program-joined:`, and `affiliate-fraud-detected:` plus the affiliate, membership, or fraud signal id). Cart, voucher, affiliate-network, and affiliate-attribution interactions have no idempotency keys: repeated interactions record distinct events.
 
@@ -364,6 +366,8 @@ php artisan signals:aggregate-daily --days=7
 php artisan signals:aggregate-daily --date=2026-03-10
 php artisan signals:aggregate-daily --from=2026-03-01 --to=2026-03-10
 ```
+
+Daily metrics store a `currency` alongside `revenue_minor` and are stamped with the tracked property's reporting currency. Rollups only sum event revenue whose currency matches the property currency; legacy foreign-currency rows contribute zero instead of being merged into the property total. Single-date and batch aggregation follow the same rule.
 
 ### Process Alert Rules
 

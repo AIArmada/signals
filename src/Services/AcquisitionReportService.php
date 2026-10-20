@@ -7,6 +7,7 @@ namespace AIArmada\Signals\Services;
 use AIArmada\Signals\Models\SavedSignalReport;
 use AIArmada\Signals\Models\SignalEvent;
 use AIArmada\Signals\Models\TrackedProperty;
+use AIArmada\Signals\Support\SignalReportRevenue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -15,7 +16,7 @@ final class AcquisitionReportService
     public function __construct(private readonly SignalSegmentReportFilter $segmentReportFilter) {}
 
     /**
-     * @return array{attributed_events:int,visitors:int,conversions:int,revenue_minor:int,campaigns:int}
+     * @return array{attributed_events:int,visitors:int,conversions:int,campaigns:int,revenue_minor?:int,currency?:string,revenue?:array<string, int>}
      */
     public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null, ?string $attributionModel = null, ?string $savedReportId = null): array
     {
@@ -34,11 +35,11 @@ final class AcquisitionReportService
             'attributed_events' => (int) (clone $query)->count(),
             'visitors' => $this->distinctActorCount(clone $query),
             'conversions' => (int) (clone $query)->where('event_category', 'conversion')->count(),
-            'revenue_minor' => (int) (clone $query)->sum('revenue_minor'),
             'campaigns' => (int) (clone $query)
                 ->whereRaw("{$campaignExpression} IS NOT NULL")
                 ->distinct(DB::raw($campaignExpression))
                 ->count(DB::raw($campaignExpression)),
+            ...SignalReportRevenue::shape($context['tracked_property_id'], SignalReportRevenue::byCurrency(clone $query)),
         ];
     }
 
@@ -75,7 +76,7 @@ final class AcquisitionReportService
             ->selectRaw('COUNT(*) as events')
             ->selectRaw('COUNT(DISTINCT COALESCE(signal_identity_id, signal_session_id, id)) as visitors')
             ->selectRaw("SUM(CASE WHEN event_category = 'conversion' THEN 1 ELSE 0 END) as conversions")
-            ->selectRaw('SUM(revenue_minor) as revenue_minor')
+            ->selectRaw(SignalReportRevenue::conditionalRevenueExpression() . ' as revenue_minor')
             ->selectRaw('MAX(occurred_at) as last_seen_at')
             ->with('trackedProperty')
             ->groupBy('tracked_property_id')
