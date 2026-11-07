@@ -21,7 +21,39 @@ final class RetentionReportService
     public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null, ?string $savedReportId = null): array
     {
         $context = $this->resolveReportContext($trackedPropertyId, $from, $until, $signalSegmentId, $savedReportId);
+
+        return $this->summarize(
+            $this->cohorts($context['tracked_property_id'], $context['from'], $context['until'], $context['signal_segment_id'], $context['retention_windows']),
+            $context['retention_windows'],
+        );
+    }
+
+    /**
+     * Build the summary and cohort rows from a single cohort query.
+     *
+     * @return array{
+     *     summary: array{cohorts:int,identities:int,windows:list<array{days:int,retained:int,avg_retention_rate:float}>},
+     *     rows: list<array{cohort_date:string,cohort_size:int,windows:list<array{days:int,retained:int,retention_rate:float}>}>
+     * }
+     */
+    public function report(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null, ?string $savedReportId = null): array
+    {
+        $context = $this->resolveReportContext($trackedPropertyId, $from, $until, $signalSegmentId, $savedReportId);
         $cohorts = $this->cohorts($context['tracked_property_id'], $context['from'], $context['until'], $context['signal_segment_id'], $context['retention_windows']);
+
+        return [
+            'summary' => $this->summarize($cohorts, $context['retention_windows']),
+            'rows' => $cohorts->values()->all(),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, array{cohort_date:string,cohort_size:int,windows:list<array{days:int,retained:int,retention_rate:float}>}>  $cohorts
+     * @param  list<int>  $retentionWindows
+     * @return array{cohorts:int,identities:int,windows:list<array{days:int,retained:int,avg_retention_rate:float}>}
+     */
+    private function summarize(Collection $cohorts, array $retentionWindows): array
+    {
         $windows = array_map(function (int $days) use ($cohorts): array {
             $retained = (int) $cohorts->sum(function (array $row) use ($days): int {
                 foreach ($row['windows'] as $window) {
@@ -47,7 +79,7 @@ final class RetentionReportService
                 'retained' => $retained,
                 'avg_retention_rate' => round((float) $avgRetentionRate, 2),
             ];
-        }, $context['retention_windows']);
+        }, $retentionWindows);
 
         return [
             'cohorts' => $cohorts->count(),

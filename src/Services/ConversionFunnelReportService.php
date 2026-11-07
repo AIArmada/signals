@@ -27,8 +27,38 @@ final class ConversionFunnelReportService
     public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null, ?string $savedReportId = null): array
     {
         $context = $this->resolveReportContext($trackedPropertyId, $from, $until, $signalSegmentId, $savedReportId);
+
+        return $this->summarize(
+            $this->buildStages($context['tracked_property_id'], $context['from'], $context['until'], $context['signal_segment_id'], $context['saved_report']),
+            $context['tracked_property_id'],
+        );
+    }
+
+    /**
+     * Build the summary and stage rows from a single funnel query.
+     *
+     * @return array{
+     *     summary: array{started:int,completed:int,paid:int,started_label:string,completed_label:string,paid_label:string,start_to_complete_rate:float,complete_to_paid_rate:float,overall_rate:float,start_drop_off:int,complete_drop_off:int,revenue_minor?:int,currency?:string,revenue?:array<string, int>},
+     *     stages: list<array{label:string,event_name:string,count:int,rate_from_previous:float,rate_from_start:float,drop_off:int,revenue_minor?:int,currency?:string,revenue?:array<string, int>}>
+     * }
+     */
+    public function report(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null, ?string $savedReportId = null): array
+    {
+        $context = $this->resolveReportContext($trackedPropertyId, $from, $until, $signalSegmentId, $savedReportId);
         $stages = $this->buildStages($context['tracked_property_id'], $context['from'], $context['until'], $context['signal_segment_id'], $context['saved_report']);
 
+        return [
+            'summary' => $this->summarize($stages, $context['tracked_property_id']),
+            'stages' => $stages,
+        ];
+    }
+
+    /**
+     * @param  list<array{label:string,event_name:string,count:int,rate_from_previous:float,rate_from_start:float,drop_off:int,revenue_minor?:int,currency?:string,revenue?:array<string, int>}>  $stages
+     * @return array{started:int,completed:int,paid:int,started_label:string,completed_label:string,paid_label:string,start_to_complete_rate:float,complete_to_paid_rate:float,overall_rate:float,start_drop_off:int,complete_drop_off:int,revenue_minor?:int,currency?:string,revenue?:array<string, int>}
+     */
+    private function summarize(array $stages, ?string $trackedPropertyId): array
+    {
         if ($stages === []) {
             return [
                 'started' => 0,
@@ -42,7 +72,7 @@ final class ConversionFunnelReportService
                 'overall_rate' => 0.0,
                 'start_drop_off' => 0,
                 'complete_drop_off' => 0,
-                ...SignalReportRevenue::shape($context['tracked_property_id'], []),
+                ...SignalReportRevenue::shape($trackedPropertyId, []),
             ];
         }
 
@@ -67,7 +97,7 @@ final class ConversionFunnelReportService
             'overall_rate' => $this->rate($paid, $started),
             'start_drop_off' => max($started - $secondStage['count'], 0),
             'complete_drop_off' => max($completed - $paid, 0),
-            ...SignalReportRevenue::shape($context['tracked_property_id'], $this->stageRevenueMap($finalStage), $finalStage['currency'] ?? null),
+            ...SignalReportRevenue::shape($trackedPropertyId, $this->stageRevenueMap($finalStage), $finalStage['currency'] ?? null),
         ];
     }
 
