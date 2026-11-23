@@ -159,29 +159,29 @@ final class CommerceSignalsRecorder
         return $this->affiliates->recordFraudSignalDetected($signal);
     }
 
-    public function recordOfferCreated(object $offer): ?SignalEvent
+    public function recordOfferCreated(object $event): ?SignalEvent
     {
-        return $this->affiliateNetwork->recordOfferCreated($offer);
+        return $this->affiliateNetwork->recordOfferCreated($event);
     }
 
-    public function recordOfferUpdated(object $offer): ?SignalEvent
+    public function recordOfferUpdated(object $event): ?SignalEvent
     {
-        return $this->affiliateNetwork->recordOfferUpdated($offer);
+        return $this->affiliateNetwork->recordOfferUpdated($event);
     }
 
-    public function recordApplicationSubmitted(object $application): ?SignalEvent
+    public function recordApplicationSubmitted(object $event): ?SignalEvent
     {
-        return $this->affiliateNetwork->recordApplicationSubmitted($application);
+        return $this->affiliateNetwork->recordApplicationSubmitted($event);
     }
 
-    public function recordApplicationApproved(object $application): ?SignalEvent
+    public function recordApplicationApproved(object $event): ?SignalEvent
     {
-        return $this->affiliateNetwork->recordApplicationApproved($application);
+        return $this->affiliateNetwork->recordApplicationApproved($event);
     }
 
-    public function recordNetworkConversionRecorded(object $link, int $revenueMinor = 0): ?SignalEvent
+    public function recordNetworkConversionRecorded(object $event): ?SignalEvent
     {
-        return $this->affiliateNetwork->recordNetworkConversion($link, $revenueMinor);
+        return $this->affiliateNetwork->recordNetworkConversion($event);
     }
 
     public function recordLinkClicked(Model $link, Model $click): ?SignalEvent

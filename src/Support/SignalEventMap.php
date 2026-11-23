@@ -38,26 +38,23 @@ final class SignalEventMap
             ],
             'AIArmada\\AffiliateNetwork\\Events\\OfferCreated' => [
                 'method' => 'recordOfferCreated',
-                'arguments' => [['property' => 'offer', 'type' => 'object']],
+                'arguments' => [['property' => null, 'type' => 'event']],
             ],
             'AIArmada\\AffiliateNetwork\\Events\\OfferUpdated' => [
                 'method' => 'recordOfferUpdated',
-                'arguments' => [['property' => 'offer', 'type' => 'object']],
+                'arguments' => [['property' => null, 'type' => 'event']],
             ],
             'AIArmada\\AffiliateNetwork\\Events\\ApplicationSubmitted' => [
                 'method' => 'recordApplicationSubmitted',
-                'arguments' => [['property' => 'application', 'type' => 'object']],
+                'arguments' => [['property' => null, 'type' => 'event']],
             ],
             'AIArmada\\AffiliateNetwork\\Events\\ApplicationApproved' => [
                 'method' => 'recordApplicationApproved',
-                'arguments' => [['property' => 'application', 'type' => 'object']],
+                'arguments' => [['property' => null, 'type' => 'event']],
             ],
             'AIArmada\\AffiliateNetwork\\Events\\NetworkConversionRecorded' => [
                 'method' => 'recordNetworkConversionRecorded',
-                'arguments' => [
-                    ['property' => 'link', 'type' => 'object'],
-                    ['property' => 'revenueMinor', 'type' => 'numeric_int'],
-                ],
+                'arguments' => [['property' => null, 'type' => 'event']],
             ],
             'AIArmada\\Cart\\Events\\ItemAdded' => [
                 'method' => 'recordCartItemAdded',
