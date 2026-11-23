@@ -48,9 +48,9 @@ use AIArmada\Signals\Support\Browser\SignalsTrackerRenderer;
 use AIArmada\Signals\Support\CommerceSignalsIntegrationRegistrar;
 use AIArmada\Signals\Support\Http\Middleware\BootstrapSignalsBrowserContext;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Http\Events\RequestHandled;
-use Illuminate\Foundation\Http\Kernel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
@@ -362,7 +362,7 @@ final class SignalsServiceProvider extends PackageServiceProvider
             return;
         }
 
-        /** @var Kernel $kernel */
+        /** @var \Illuminate\Foundation\Http\Kernel $kernel */
         $kernel = $this->app->make(Kernel::class);
         $kernel->appendMiddlewareToGroup(
             (string) config('signals.integrations.browser.middleware_group', 'web'),
