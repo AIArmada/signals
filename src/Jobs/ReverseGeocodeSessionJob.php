@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace AIArmada\Signals\Jobs;
 
 use AIArmada\CommerceSupport\Contracts\OwnerScopedJob;
-use AIArmada\CommerceSupport\Support\OwnerJobContext;
+use AIArmada\CommerceSupport\Data\OwnerJobContext;
 use AIArmada\CommerceSupport\Traits\OwnerContextJob;
 use AIArmada\Signals\Models\SignalSession;
 use AIArmada\Signals\Services\SignalLocationResolverPipeline;

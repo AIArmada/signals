@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace AIArmada\Signals\Jobs;
 
 use AIArmada\CommerceSupport\Contracts\OwnerScopedJob;
-use AIArmada\CommerceSupport\Http\PinnedHttpClient;
+use AIArmada\CommerceSupport\Data\OwnerJobContext;
+use AIArmada\CommerceSupport\Drivers\Http\PinnedHttpClient;
 use AIArmada\CommerceSupport\Support\OwnerContext;
-use AIArmada\CommerceSupport\Support\OwnerJobContext;
+use AIArmada\CommerceSupport\Support\OwnerJobContextMapper;
 use AIArmada\CommerceSupport\Support\PublicHttpUrlGuard;
 use AIArmada\CommerceSupport\Traits\OwnerContextJob;
 use AIArmada\Signals\Models\SignalAlertDelivery;
@@ -80,7 +81,7 @@ final class DispatchSignalAlertDelivery implements OwnerScopedJob, ShouldQueue
     {
         try {
             $context = $this->ownerContext();
-            $owner = $context->isExplicitGlobal() ? null : $context->toOwnerModelOrFail();
+            $owner = $context->isExplicitGlobal() ? null : OwnerJobContextMapper::resolve($context);
         } catch (Throwable) {
             return;
         }
