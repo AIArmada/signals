@@ -22,19 +22,15 @@ final class SignalEventMap
             ],
             'AIArmada\\Affiliates\\Events\\AffiliateCreated' => [
                 'method' => 'recordAffiliateCreated',
-                'arguments' => [['property' => 'affiliate', 'type' => 'model']],
+                'arguments' => [['property' => 'affiliate', 'type' => 'object']],
             ],
             'AIArmada\\Affiliates\\Events\\AffiliateProgramJoined' => [
                 'method' => 'recordAffiliateProgramJoined',
-                'arguments' => [
-                    ['property' => 'affiliate', 'type' => 'model'],
-                    ['property' => 'program', 'type' => 'model'],
-                    ['property' => 'membership', 'type' => 'model'],
-                ],
+                'arguments' => [['property' => 'reference', 'type' => 'object']],
             ],
             'AIArmada\\Affiliates\\Events\\FraudSignalDetected' => [
                 'method' => 'recordAffiliateFraudSignalDetected',
-                'arguments' => [['property' => 'signal', 'type' => 'model']],
+                'arguments' => [['property' => 'signal', 'type' => 'object']],
             ],
             'AIArmada\\AffiliateNetwork\\Events\\OfferCreated' => [
                 'method' => 'recordOfferCreated',

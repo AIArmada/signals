@@ -90,17 +90,9 @@ final class SignalRecorderSupport
         return $this->trackedPropertyResolver->resolveForOwnerReference($ownerType, $ownerId, $writeKey, $source);
     }
 
-    public function resolveTrackedPropertyForAffiliateModel(Model $model): ?TrackedProperty
+    public function resolveTrackedPropertyForAffiliateOwner(?string $ownerType, string | int | null $ownerId): ?TrackedProperty
     {
-        // Trust boundary: a half-null tuple must never fall through to a
-        // global property, and a deleted owner must never route into an
-        // orphaned property. Both fail here instead.
-        $owner = OwnerContext::fromTypeAndIdOrFail(
-            $this->stringValue($model->getAttribute('owner_type')),
-            $model->getAttribute('owner_id'),
-        );
-
-        return $this->trackedPropertyResolver->resolveForOwner($owner);
+        return $this->trackedPropertyResolver->resolveForOwner(OwnerContext::fromTypeAndIdOrFail($ownerType, $ownerId));
     }
 
     public function modelAttribute(Model $model, string $attribute): mixed
@@ -287,80 +279,5 @@ final class SignalRecorderSupport
         }
 
         return (bool) $events[$eventName];
-    }
-
-    public function resolveAffiliateModel(
-        string $modelClass,
-        ?string $identifier,
-        ?string $expectedAffiliateId = null,
-        ?string $expectedAffiliateCode = null,
-        ?string $expectedOwnerType = null,
-        string | int | null $expectedOwnerId = null,
-    ): ?Model {
-        if ($identifier === null || $identifier === '' || ! class_exists($modelClass) || ! is_subclass_of($modelClass, Model::class)) {
-            return null;
-        }
-
-        /** @var class-string<Model> $modelClass */
-        $query = $modelClass::query();
-
-        if (method_exists($modelClass, 'scopeWithoutOwnerScope')) {
-            /** @var mixed $ownerScopedQuery */
-            $ownerScopedQuery = $query;
-            $query = $ownerScopedQuery->withoutOwnerScope();
-        }
-
-        if ($expectedAffiliateId !== null && $expectedAffiliateId !== '') {
-            $query->where('affiliate_id', $expectedAffiliateId);
-        }
-
-        if ($expectedAffiliateCode !== null && $expectedAffiliateCode !== '') {
-            $query->where('affiliate_code', $expectedAffiliateCode);
-        }
-
-        if ($expectedOwnerType !== null && $expectedOwnerType !== '') {
-            $query->where('owner_type', $expectedOwnerType);
-        }
-
-        if ($expectedOwnerId !== null && $expectedOwnerId !== '') {
-            $query->where('owner_id', $expectedOwnerId);
-        }
-
-        $model = $query->find($identifier);
-
-        return $model instanceof Model ? $model : null;
-    }
-
-    /**
-     * Re-read a canonical source row by its own key.
-     *
-     * Unlike resolveAffiliateModel(), no affiliate_id/affiliate_code
-     * predicates are applied: the caller owns reference verification
-     * against the re-read row.
-     */
-    public function resolveSourceModel(string $modelClass, ?string $identifier): ?Model
-    {
-        if ($identifier === null || $identifier === '' || ! class_exists($modelClass) || ! is_subclass_of($modelClass, Model::class)) {
-            return null;
-        }
-
-        /** @var class-string<Model> $modelClass */
-        $query = $modelClass::query();
-
-        if (method_exists($modelClass, 'scopeWithoutOwnerScope')) {
-            /** @var mixed $ownerScopedQuery */
-            $ownerScopedQuery = $query;
-            $query = $ownerScopedQuery->withoutOwnerScope();
-        }
-
-        // Memberships and fraud signals scope through the affiliates
-        // package's derived affiliate_owner scope instead. A trusted,
-        // ID-constrained re-read must see the canonical row regardless of
-        // ambient owner context; callers verify references and derive the
-        // owner from the canonical affiliate afterwards. No-op for models
-        // without that scope.
-        $model = $query->withoutGlobalScope('affiliate_owner')->find($identifier);
-
-        return $model instanceof Model ? $model : null;
     }
 }

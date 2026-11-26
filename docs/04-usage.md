@@ -302,9 +302,9 @@ $recorder->recordOrderRefunded($order, $refundId, $amount, $reason);
 $recorder->recordCheckoutCompleted($checkout);
 $recorder->recordAffiliateAttributed($attribution);
 $recorder->recordAffiliateConversionRecorded($conversion);
-$recorder->recordAffiliateCreated($affiliate);
-$recorder->recordAffiliateProgramJoined($affiliate, $program, $membership);
-$recorder->recordAffiliateFraudSignalDetected($fraudSignal);
+$recorder->recordAffiliateCreated($affiliateLifecycleReference);
+$recorder->recordAffiliateProgramJoined($programJoinReference);
+$recorder->recordAffiliateFraudSignalDetected($fraudSignalReference);
 $recorder->recordLinkClicked($link, $click);
 ```
 
