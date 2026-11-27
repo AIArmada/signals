@@ -197,6 +197,8 @@ Supported overrides include:
 
 When Growth is installed and an experiment context is active, the renderer also includes the current experiment attribution in `data-page-properties` automatically.
 
+Integrations can add page properties without replacing the renderer. Implement `AIArmada\Signals\Features\Browser\Api\BrowserPagePropertyContributor` and register the instance on `AIArmada\Signals\Features\Browser\Queries\BrowserPagePropertyRegistry` (resolved through `BrowserPageProperties`). Contributors are merged in registration order; Growth registers its contributor only while `growth.integrations.signals.enabled` is on.
+
 ### Manual script-tag requirements
 
 If you bypass `@signalsTracker` and render the script tag manually, make sure it includes:

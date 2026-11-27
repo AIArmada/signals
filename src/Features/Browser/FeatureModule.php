@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace AIArmada\Signals\Features\Browser;
 
 use AIArmada\Signals\Contracts\BrowserContextResolverInterface;
+use AIArmada\Signals\Features\Browser\Api\BrowserPageProperties;
 use AIArmada\Signals\Features\Browser\Api\TrackerMarkup;
 use AIArmada\Signals\Features\Browser\EntryPoints\Http\Middleware\BootstrapSignalsBrowserContext;
 use AIArmada\Signals\Features\Browser\EntryPoints\Http\SignalsBrowserContextResolver;
 use AIArmada\Signals\Features\Browser\EntryPoints\Listeners\InjectSignalsTrackerIntoHtmlResponse;
+use AIArmada\Signals\Features\Browser\Queries\BrowserPagePropertyRegistry;
 use AIArmada\Signals\Features\Browser\Queries\SignalsTrackerRenderer;
 use AIArmada\Signals\Platform\FeatureModule as FeatureModuleContract;
 use AIArmada\Signals\Support\Http\SignalsBrowserContextManager;
@@ -24,6 +26,7 @@ final class FeatureModule implements FeatureModuleContract
     {
         $app->scoped(SignalsBrowserContextManager::class);
         $app->bind(TrackerMarkup::class, SignalsTrackerRenderer::class);
+        $app->singleton(BrowserPageProperties::class, BrowserPagePropertyRegistry::class);
         $app->bind(BrowserContextResolverInterface::class, SignalsBrowserContextResolver::class);
     }
 

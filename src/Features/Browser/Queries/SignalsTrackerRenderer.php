@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Features\Browser\Queries;
 
-use AIArmada\Growth\Support\Context\ExperimentContextManager;
+use AIArmada\Signals\Features\Browser\Api\BrowserPageProperties;
 use AIArmada\Signals\Features\Browser\Api\TrackerMarkup;
 use AIArmada\Signals\Features\Ingestion\Api\BrowserInteractionRules;
 use AIArmada\Signals\Features\Ingestion\Api\BrowserProperty;
@@ -22,6 +22,7 @@ final class SignalsTrackerRenderer implements TrackerMarkup
         private readonly SignalsBrowserContextManager $browserContextManager,
         private readonly BrowserPropertyResolver $trackedPropertyResolver,
         private readonly BrowserInteractionRules $browserInteractionRules,
+        private readonly BrowserPageProperties $browserPageProperties,
     ) {}
 
     /**
@@ -102,7 +103,7 @@ final class SignalsTrackerRenderer implements TrackerMarkup
     private function pageProperties(array $overrides): array
     {
         $properties = [];
-        $contextProperties = $this->experimentContextProperties();
+        $contextProperties = $this->browserPageProperties->currentPageProperties();
 
         if ($contextProperties !== []) {
             $properties = array_merge($properties, $contextProperties);
@@ -115,28 +116,6 @@ final class SignalsTrackerRenderer implements TrackerMarkup
         }
 
         return $properties;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function experimentContextProperties(): array
-    {
-        if (! class_exists(ExperimentContextManager::class) || ! app()->bound(ExperimentContextManager::class)) {
-            return [];
-        }
-
-        $context = app(ExperimentContextManager::class)->current();
-
-        if ($context === null) {
-            return [];
-        }
-
-        $primaryContext = $context->toArray();
-
-        return array_merge($primaryContext, [
-            'experiment_contexts' => [$primaryContext],
-        ]);
     }
 
     /**
