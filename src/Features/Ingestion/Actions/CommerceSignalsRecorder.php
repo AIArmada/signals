@@ -209,7 +209,7 @@ final class CommerceSignalsRecorder
             'event_name' => $eventName,
             'event_category' => $data['event_category'] ?? 'commerce',
             'occurred_at' => $this->support->timestampValue($data['occurred_at'] ?? CarbonImmutable::now()),
-            'revenue_minor' => (int) ($data['revenue_minor'] ?? 0),
+            'revenue_minor' => $data['revenue_minor'] ?? 0,
             'currency' => (string) ($data['currency'] ?? config('signals.defaults.currency', 'MYR')),
             'external_id' => $data['external_id'] ?? null,
             'anonymous_id' => $data['anonymous_id'] ?? null,

@@ -116,7 +116,7 @@ Server outcomes require `X-Signals-Timestamp` and `X-Signals-Signature` headers.
 }
 ```
 
-`revenue_minor` is integer minor units. A trusted event can only record revenue in the tracked property's reporting currency: a nonzero amount with a `currency` that differs from the property currency is rejected before any identity, session, or event row is written. A zero-value event, or an omitted `currency`, adopts the property currency, and stored codes are uppercased. There is no FX conversion.
+`revenue_minor` is integer minor units. The trusted ingestion boundary accepts a PHP integer or a base-10 integer string (an optional sign and surrounding whitespace are allowed); decimal, scientific, float, boolean, and other non-integer representations are rejected, and values above `PHP_INT_MAX` throw `InvalidArgumentException` before any cast. Negative values clamp to zero. A trusted event can only record revenue in the tracked property's reporting currency: a nonzero amount with a `currency` that differs from the property currency is rejected before any identity, session, or event row is written. A zero-value event, or an omitted `currency`, adopts the property currency, and stored codes are uppercased. There is no FX conversion.
 
 ## Campaign Attribution
 
@@ -172,6 +172,8 @@ When `signals.integrations.browser.enabled` is `true`, Signals can bootstrap bro
 - auto-injection skips binary/streamed responses and will not double-inject if you rendered `@signalsTracker(...)` manually
 
 If you keep `auto_register_middleware = true`, the middleware is appended to the configured group automatically.
+
+Application code that needs the resolved context can inject `AIArmada\Signals\Support\Http\SignalsBrowserContextManager` and pass its explicit request to `current()` or `resolveOrCreate()`. The manager never substitutes a different container request, so a request you supply is the request it reads and persists to.
 
 ### Explicit tracker rendering
 
@@ -346,7 +348,7 @@ $event->id;
 $event->idempotencyKey;
 ```
 
-The API resolves the property inside the current owner scope. When owner scoping is enabled, a global property requires an explicit `OwnerContext::withOwner(null, ...)` around the call; a property owned by another owner throws `AuthorizationException`. `trusted: true` records revenue and idempotency fields. `trusted: false` applies the tracked property's property allowlist and forces revenue to zero; it does not run the browser event-name allowlist or reject trusted fields. Callers that accept untrusted input must run `SignalsIngestionRequestValidator::assertUntrustedEvent()` first, as the mobile telemetry action does.
+The API resolves the property inside the current owner scope and rejects inactive properties and missing or invalid event names. When owner scoping is enabled, a global property requires an explicit `OwnerContext::withOwner(null, ...)` around the call; a property owned by another owner throws `AuthorizationException`. `trusted: true` records revenue and idempotency fields. `trusted: false` enforces the browser event-name allowlist, structural payload limits and forbidden financial fields, applies the configured property allowlist, and forces revenue to zero. Application-owned endpoints must still enforce authentication, request byte limits and rate limits before invoking the API.
 
 ## Actions
 
@@ -359,7 +361,7 @@ use AIArmada\Signals\Features\Alerts\Actions\EvaluateAlertRules;
 use AIArmada\Signals\Features\Ingestion\Models\TrackedProperty;
 
 // Ingest a signal event into a tracked property
-$event = IngestSignalEvent::run($trackedProperty, [
+$event = app(IngestSignalEvent::class)->handle($trackedProperty, [
     'event_name' => 'checkout.completed',
     'event_category' => 'checkout',
     'external_id' => 'user-123',
@@ -368,14 +370,15 @@ $event = IngestSignalEvent::run($trackedProperty, [
 ], trusted: true);
 
 // Resolve or create a session for a tracked property
+$identity = $event->identity;
 $session = app(ResolveSession::class)->handle($trackedProperty, $identity, [
     'session_identifier' => 'sig_session_1',
     'path' => '/checkout',
 ]);
 
 // Evaluate active alert rules
-$result = EvaluateAlertRules::run(); // ['processed' => 5, 'skipped' => 1, 'dispatched' => 2]
-$result = EvaluateAlertRules::run(trackedPropertyId: $property->id, dryRun: true);
+$result = app(EvaluateAlertRules::class)->handle(); // ['processed' => 5, 'skipped' => 1, 'dispatched' => 2]
+$result = app(EvaluateAlertRules::class)->handle(trackedPropertyId: $trackedProperty->id, dryRun: true);
 ```
 
 - **`IngestSignalEvent`** — requires callers to explicitly choose `trusted: true` or `trusted: false`, then handles boundary-scoped idempotency via `idempotency_key` (`source_event_id` fallback on trusted paths), identity resolution, session stitching, and property allowlisting, plus optional on-ingest alert evaluation scheduled with `DB::afterCommit` so queued and inline alert effects only run after the outermost transaction commits and are discarded on rollback. Simultaneous duplicate ingestion on one boundary persists exactly one event and rolls back the loser's session/identity side effects; the owning top-level transaction retries deadlocks a bounded number of times before surfacing them, and when you already own an outer transaction around ingestion that outer `DB::transaction(..., attempts: 5)` owns the retry while nested savepoints do not retry locally. Session `ended_at`, `duration_milliseconds`, and `exit_path` only ever advance to the latest event time, so out-of-order and backdated events cannot shrink a session, and `bounced_at` clears once a second event lands on the session.

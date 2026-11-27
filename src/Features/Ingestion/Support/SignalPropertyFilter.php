@@ -23,13 +23,13 @@ final class SignalPropertyFilter
         'email',
         'phone',
         'name',
-        'first_name',
-        'last_name',
-        'customer_email',
-        'customer_phone',
-        'customer_name',
+        'firstname',
+        'lastname',
+        'customeremail',
+        'customerphone',
+        'customername',
         'metadata',
-        'cart_metadata',
+        'cartmetadata',
     ];
 
     private const MAX_DEPTH = 10;
@@ -80,7 +80,9 @@ final class SignalPropertyFilter
                 continue;
             }
 
-            if (in_array($key, self::BLOCKED_KEYS, true)) {
+            $normalized = mb_strtolower(preg_replace('/[^a-z0-9]+/i', '', $key) ?? $key);
+
+            if (in_array($normalized, self::BLOCKED_KEYS, true)) {
                 continue;
             }
 

@@ -92,7 +92,7 @@ src/
 │   ├── Alerts/            # Alert rules, logs and delivery
 │   └── Browser/           # Context middleware and tracker rendering
 ├── Platform/              # Feature discovery and extension registration
-├── Support/
+├── Support/               # Shared primitives and the HTTP browser context adapter
 └── SignalsServiceProvider.php
 ```
 

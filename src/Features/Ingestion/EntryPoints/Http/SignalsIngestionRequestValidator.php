@@ -5,32 +5,18 @@ declare(strict_types=1);
 namespace AIArmada\Signals\Features\Ingestion\EntryPoints\Http;
 
 use AIArmada\Signals\Features\Ingestion\Models\TrackedProperty;
+use AIArmada\Signals\Features\Ingestion\Support\BrowserPayloadPolicy;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class SignalsIngestionRequestValidator
 {
-    /** @var list<string> */
-    private const BROWSER_FORBIDDEN_FIELDS = [
-        'checkout_session_id',
-        'conversion_id',
-        'currency',
-        'external_reference',
-        'order_id',
-        'order_number',
-        'order_reference',
-        'payment_id',
-        'revenue',
-        'revenue_minor',
-        'source_event_id',
-        'source_transaction_id',
-        'transaction_id',
-    ];
-
-    public function __construct(private readonly RateLimiter $rateLimiter) {}
+    public function __construct(
+        private readonly RateLimiter $rateLimiter,
+        private readonly BrowserPayloadPolicy $payloadPolicy,
+    ) {}
 
     public function resolveTrackedProperty(Request $request, string $writeKey): TrackedProperty
     {
@@ -58,9 +44,9 @@ final class SignalsIngestionRequestValidator
         $this->assertWriteKeyNotInQueryString($request);
         $this->assertPayloadWithinLimits($request, 'browser');
         if ($eventName === null) {
-            $this->assertBrowserPayloadContainsNoTrustedFields($request->all());
+            $this->payloadPolicy->assertNoTrustedFields($request->all());
         } else {
-            $this->assertUntrustedEvent($eventName, $request->all());
+            $this->payloadPolicy->assertEvent($eventName, $request->all());
         }
 
         $this->assertRateLimit(
@@ -71,18 +57,6 @@ final class SignalsIngestionRequestValidator
             key: 'signals:browser:ip:' . ($request->ip() ?? 'unknown'),
             attempts: max(1, (int) config('signals.ingestion.browser.rate_limit_per_minute', 120)),
         );
-    }
-
-    /**
-     * Validate an untrusted event that is ingested through an application-owned
-     * endpoint instead of the package browser route.
-     *
-     * @param  array<array-key, mixed>  $payload
-     */
-    public function assertUntrustedEvent(string $eventName, array $payload = []): void
-    {
-        $this->assertBrowserEventAllowed($eventName);
-        $this->assertBrowserPayloadContainsNoTrustedFields($payload);
     }
 
     public function assertTrustedPayloadWithinLimits(Request $request): void
@@ -125,114 +99,7 @@ final class SignalsIngestionRequestValidator
             ]);
         }
 
-        $maxDepth = max(1, (int) config("signals.ingestion.{$boundary}.max_depth", 4));
-        $maxKeys = max(1, (int) config("signals.ingestion.{$boundary}.max_keys", 64));
-        $maxStringBytes = max(1, (int) config("signals.ingestion.{$boundary}.max_string_bytes", 1024));
-        $keyCount = 0;
-
-        $this->walkPayload($request->all(), 1, $maxDepth, $maxKeys, $maxStringBytes, $keyCount);
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $values
-     */
-    private function walkPayload(
-        array $values,
-        int $depth,
-        int $maxDepth,
-        int $maxKeys,
-        int $maxStringBytes,
-        int &$keyCount,
-    ): void {
-        if ($depth > $maxDepth) {
-            throw ValidationException::withMessages([
-                'payload' => "The Signals payload exceeds the maximum nesting depth of {$maxDepth}.",
-            ]);
-        }
-
-        foreach ($values as $key => $value) {
-            $keyCount++;
-
-            if ($keyCount > $maxKeys) {
-                throw ValidationException::withMessages([
-                    'payload' => "The Signals payload exceeds the maximum key count of {$maxKeys}.",
-                ]);
-            }
-
-            if (is_string($key) && mb_strlen($key, '8bit') > $maxStringBytes) {
-                throw ValidationException::withMessages([
-                    'payload' => "A Signals payload key exceeds {$maxStringBytes} bytes.",
-                ]);
-            }
-
-            if (is_string($value) && mb_strlen($value, '8bit') > $maxStringBytes) {
-                throw ValidationException::withMessages([
-                    'payload' => "A Signals payload value exceeds {$maxStringBytes} bytes.",
-                ]);
-            }
-
-            if (is_array($value)) {
-                $this->walkPayload($value, $depth + 1, $maxDepth, $maxKeys, $maxStringBytes, $keyCount);
-            }
-        }
-    }
-
-    private function assertBrowserEventAllowed(string $eventName): void
-    {
-        $configured = config('signals.ingestion.browser.event_allowlist', []);
-        $patterns = is_array($configured) ? array_values(array_filter($configured, 'is_string')) : [];
-
-        foreach ($patterns as $pattern) {
-            if (Str::is($pattern, $eventName)) {
-                return;
-            }
-        }
-
-        throw ValidationException::withMessages([
-            'event_name' => 'This event is not allowed on the public browser ingestion route.',
-        ]);
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $payload
-     */
-    private function assertBrowserPayloadContainsNoTrustedFields(array $payload): void
-    {
-        $found = $this->findForbiddenField($payload);
-
-        if ($found === null) {
-            return;
-        }
-
-        throw ValidationException::withMessages([
-            $found => 'Financial and transaction identifiers require the signed server-outcome route.',
-        ]);
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $values
-     */
-    private function findForbiddenField(array $values): ?string
-    {
-        foreach ($values as $key => $value) {
-            if (is_string($key)) {
-                $normalized = mb_strtolower(preg_replace('/[^a-z0-9]+/i', '_', $key) ?? $key);
-
-                if (in_array($normalized, self::BROWSER_FORBIDDEN_FIELDS, true)) {
-                    return $key;
-                }
-            }
-
-            if (is_array($value)) {
-                $found = $this->findForbiddenField($value);
-
-                if ($found !== null) {
-                    return $found;
-                }
-            }
-        }
-
-        return null;
+        $this->payloadPolicy->assertStructure($request->all(), $boundary);
     }
 
     private function assertRateLimit(string $key, int $attempts): void

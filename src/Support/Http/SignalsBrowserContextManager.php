@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace AIArmada\Signals\Features\Browser\EntryPoints\Http;
+namespace AIArmada\Signals\Support\Http;
 
 use AIArmada\Signals\Data\SignalsBrowserContext;
+use AIArmada\Signals\Support\SignalIdentifier;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Response;
-use Throwable;
 
 final class SignalsBrowserContextManager
 {
@@ -18,14 +18,8 @@ final class SignalsBrowserContextManager
 
     public const string TRACKER_RENDERED_ATTRIBUTE = 'signals.browser.tracker_rendered';
 
-    public function current(?Request $request = null): ?SignalsBrowserContext
+    public function current(Request $request): ?SignalsBrowserContext
     {
-        $request ??= $this->request();
-
-        if (! $request instanceof Request) {
-            return null;
-        }
-
         $context = $request->attributes->get(self::CONTEXT_ATTRIBUTE);
 
         return $context instanceof SignalsBrowserContext ? $context : null;
@@ -39,8 +33,8 @@ final class SignalsBrowserContextManager
             return $current;
         }
 
-        $visitorId = $this->normalizeIdentifier($request->cookies->get($this->visitorCookieName()));
-        $sessionId = $this->normalizeIdentifier($request->cookies->get($this->sessionCookieName()));
+        $visitorId = SignalIdentifier::normalize($request->cookies->get($this->visitorCookieName()));
+        $sessionId = SignalIdentifier::normalize($request->cookies->get($this->sessionCookieName()));
         $visitorWasGenerated = $visitorId === null;
         $sessionWasGenerated = $sessionId === null;
 
@@ -62,25 +56,13 @@ final class SignalsBrowserContextManager
         $request->attributes->set(self::CONTEXT_ATTRIBUTE, $context);
     }
 
-    public function wasTrackerRendered(?Request $request = null): bool
+    public function wasTrackerRendered(Request $request): bool
     {
-        $request ??= $this->request();
-
-        if (! $request instanceof Request) {
-            return false;
-        }
-
         return (bool) $request->attributes->get(self::TRACKER_RENDERED_ATTRIBUTE, false);
     }
 
-    public function markTrackerRendered(?Request $request = null): void
+    public function markTrackerRendered(Request $request): void
     {
-        $request ??= $this->request();
-
-        if (! $request instanceof Request) {
-            return;
-        }
-
         $request->attributes->set(self::TRACKER_RENDERED_ATTRIBUTE, true);
     }
 
@@ -161,28 +143,6 @@ final class SignalsBrowserContextManager
     private function generateSessionId(): string
     {
         return 'sigs_' . Str::lower((string) Str::ulid());
-    }
-
-    private function normalizeIdentifier(mixed $value): ?string
-    {
-        if (! is_scalar($value)) {
-            return null;
-        }
-
-        $normalized = mb_trim((string) $value);
-
-        return $normalized === '' ? null : $normalized;
-    }
-
-    private function request(): ?Request
-    {
-        try {
-            $request = app('request');
-
-            return $request instanceof Request ? $request : null;
-        } catch (Throwable) {
-            return null;
-        }
     }
 
     private function stringConfig(string $key, string $default): string

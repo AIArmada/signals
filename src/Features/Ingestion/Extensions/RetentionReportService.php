@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AIArmada\Signals\Features\Ingestion\Extensions;
 
 use AIArmada\Signals\Contracts\ReportInterface;
+use AIArmada\Signals\Features\Ingestion\Api\RetentionReportRead;
 use AIArmada\Signals\Features\Ingestion\Models\SignalIdentity;
 use AIArmada\Signals\Features\Ingestion\Queries\SignalSegmentReportFilter;
 use AIArmada\Signals\Features\Reporting\Api\ReportConfiguration;
@@ -13,7 +14,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
-final class RetentionReportService implements ReportInterface
+final class RetentionReportService implements ReportInterface, RetentionReportRead
 {
     public function type(): string
     {

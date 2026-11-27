@@ -12,6 +12,7 @@ use AIArmada\Signals\Features\Ingestion\Models\TrackedProperty;
 use AIArmada\Signals\Features\Ingestion\Queries\CrossTenantQuery;
 use AIArmada\Signals\Support\DuplicateKeyViolation;
 use AIArmada\Signals\Support\RecordingTransaction;
+use AIArmada\Signals\Support\SignalIdentifier;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\QueryException;
@@ -28,9 +29,9 @@ final readonly class ResolveSession
      */
     public function handle(TrackedProperty $trackedProperty, ?SignalIdentity $identity, array $payload): ?SignalSession
     {
-        $sessionIdentifier = $payload['session_identifier'] ?? null;
+        $sessionIdentifier = SignalIdentifier::normalize($payload['session_identifier'] ?? null);
 
-        if (! is_string($sessionIdentifier) || $sessionIdentifier === '') {
+        if ($sessionIdentifier === null) {
             return null;
         }
 
@@ -152,7 +153,7 @@ final readonly class ResolveSession
         bool $storeRaw,
     ): void {
         $session->fill([
-            'signal_identity_id' => $identity?->id,
+            'signal_identity_id' => $identity?->id ?? $session->signal_identity_id,
             'entry_path' => $session->entry_path ?? ($payload['path'] ?? null),
             'country_code' => $session->country_code ?? $this->resolveCountryCode($request, $payload),
             'country_source' => $session->country_source ?? $this->resolveCountrySource($request, $payload),
@@ -206,44 +207,44 @@ final readonly class ResolveSession
 
     private function resolveCountryCode(?Request $request, array $payload): ?string
     {
-        if ($request !== null && $request->isFromTrustedProxy()) {
-            $cfCountry = $request->header('CF-IPCountry');
-            if (
-                $cfCountry !== null
-                && preg_match('/^[A-Z]{2}$/', $cfCountry)
-                && ! in_array($cfCountry, ['XX', 'T1'], true)
-            ) {
-                return $cfCountry;
-            }
-        }
-
-        $payloadCountry = $payload['country_code'] ?? null;
-        if (is_string($payloadCountry) && preg_match('/^[A-Z]{2}$/', mb_strtoupper($payloadCountry))) {
-            return mb_strtoupper($payloadCountry);
-        }
-
-        return null;
+        return $this->resolveCountry($request, $payload)['code'];
     }
 
     private function resolveCountrySource(?Request $request, array $payload): ?string
     {
+        return $this->resolveCountry($request, $payload)['source'];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{code: string|null, source: string|null}
+     */
+    private function resolveCountry(?Request $request, array $payload): array
+    {
         if ($request !== null && $request->isFromTrustedProxy()) {
-            $cfCountry = $request->header('CF-IPCountry');
-            if (
-                $cfCountry !== null
-                && preg_match('/^[A-Z]{2}$/', $cfCountry)
-                && ! in_array($cfCountry, ['XX', 'T1'], true)
-            ) {
-                return 'cloudflare';
+            $countryCode = $this->normalizeCountryCode($request->header('CF-IPCountry'));
+
+            if ($countryCode !== null && ! in_array($countryCode, ['XX', 'T1'], true)) {
+                return ['code' => $countryCode, 'source' => 'cloudflare'];
             }
         }
 
-        $payloadCountry = $payload['country_code'] ?? null;
-        if (is_string($payloadCountry) && $payloadCountry !== '') {
-            return 'payload';
+        $countryCode = $this->normalizeCountryCode($payload['country_code'] ?? null);
+
+        return $countryCode === null
+            ? ['code' => null, 'source' => null]
+            : ['code' => $countryCode, 'source' => 'payload'];
+    }
+
+    private function normalizeCountryCode(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
         }
 
-        return null;
+        $countryCode = mb_strtoupper($value);
+
+        return preg_match('/\A[A-Z]{2}\z/', $countryCode) === 1 ? $countryCode : null;
     }
 
     private function resolveClientIp(Request $request): ?string
@@ -265,7 +266,7 @@ final readonly class ResolveSession
             if ($packed === false) {
                 return $ip;
             }
-            $anonymized = mb_substr($packed, 0, 6) . str_repeat("\x00", 10);
+            $anonymized = mb_substr($packed, 0, 6, '8bit') . str_repeat("\x00", 10);
 
             return inet_ntop($anonymized) ?: $ip;
         }

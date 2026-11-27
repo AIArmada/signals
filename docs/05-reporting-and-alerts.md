@@ -151,4 +151,6 @@ foreach ($dashboard->availableReports() as $type => $name) {
 }
 ```
 
+For specialized report reads, inject the Ingestion `GoalsReportRead`, `RetentionReportRead`, `ConversionFunnelReportRead`, `AcquisitionReportRead`, `ContentPerformanceReportRead`, `DevicesReportRead`, `JourneyReportRead`, or `LiveActivityReportRead` interface. Database-backed Filament tables use the owner-scoped report query entry points on `SignalEvent` and `SignalSession`, rather than importing concrete report services.
+
 To add a custom report, implement `ReportInterface` and register it on the Reporting feature's `ReportRegistry` singleton in your service provider. Built-in telemetry readers implement the interface directly and are discovered through the `signals.reports` extension slot.

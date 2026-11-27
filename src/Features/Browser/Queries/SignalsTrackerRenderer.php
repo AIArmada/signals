@@ -6,10 +6,10 @@ namespace AIArmada\Signals\Features\Browser\Queries;
 
 use AIArmada\Growth\Support\Context\ExperimentContextManager;
 use AIArmada\Signals\Features\Browser\Api\TrackerMarkup;
-use AIArmada\Signals\Features\Browser\EntryPoints\Http\SignalsBrowserContextManager;
 use AIArmada\Signals\Features\Ingestion\Api\BrowserInteractionRules;
 use AIArmada\Signals\Features\Ingestion\Api\BrowserProperty;
 use AIArmada\Signals\Features\Ingestion\Api\BrowserPropertyResolver;
+use AIArmada\Signals\Support\Http\SignalsBrowserContextManager;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Model;

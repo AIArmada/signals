@@ -236,10 +236,33 @@ final readonly class IngestSignalEvent
 
     private function normalizeRevenueMinor(mixed $value): int
     {
-        if (! is_numeric($value)) {
+        if (is_int($value)) {
+            return max(0, $value);
+        }
+
+        if (! is_string($value)) {
+            throw new InvalidArgumentException('Revenue must be a base-10 integer minor-unit amount.');
+        }
+
+        $normalized = mb_trim($value);
+
+        if ($normalized === '' || preg_match('/\A[+-]?\d+\z/', $normalized) !== 1) {
+            throw new InvalidArgumentException('Revenue must be a base-10 integer minor-unit amount.');
+        }
+
+        $negative = str_starts_with($normalized, '-');
+        $digits = mb_ltrim(mb_ltrim($normalized, '+-'), '0');
+
+        if ($digits === '' || $negative) {
             return 0;
         }
 
-        return max(0, (int) round((float) $value));
+        $max = (string) PHP_INT_MAX;
+
+        if (mb_strlen($digits) > mb_strlen($max) || (mb_strlen($digits) === mb_strlen($max) && strcmp($digits, $max) > 0)) {
+            throw new InvalidArgumentException('Revenue exceeds the supported minor-unit range.');
+        }
+
+        return (int) $digits;
     }
 }

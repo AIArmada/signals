@@ -87,9 +87,12 @@ final class SignalsServiceProvider extends PackageServiceProvider
             $limit = max(1, (int) config('signals.ingestion.browser.rate_limit_per_minute', 120));
             $propertyLimit = max(1, (int) config('signals.ingestion.browser.property_rate_limit_per_minute', 120));
 
+            $writeKey = $request->input('write_key');
+            $writeKey = is_string($writeKey) ? $writeKey : '';
+
             return [
                 Limit::perMinute($limit)->by('signals:collect:ip:' . ($request->ip() ?? 'unknown')),
-                Limit::perMinute($propertyLimit)->by('signals:collect:write-key:' . hash('sha256', (string) $request->input('write_key', ''))),
+                Limit::perMinute($propertyLimit)->by('signals:collect:write-key:' . hash('sha256', $writeKey)),
             ];
         });
     }

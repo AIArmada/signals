@@ -47,10 +47,17 @@ final class CrossTenantQuery
      */
     public static function identityQuery(TrackedProperty $trackedProperty, string $externalId): Builder
     {
+        return self::identitiesForProperty($trackedProperty)->where('external_id', $externalId);
+    }
+
+    /**
+     * @return Builder<SignalIdentity>
+     */
+    public static function identitiesForProperty(TrackedProperty $trackedProperty): Builder
+    {
         return SignalIdentity::query()
             ->withoutOwnerScope()
             ->where('tracked_property_id', $trackedProperty->id)
-            ->where('external_id', $externalId)
             ->where(function (Builder $query) use ($trackedProperty): void {
                 self::applyPropertyOwnerTuple($query, $trackedProperty);
             });

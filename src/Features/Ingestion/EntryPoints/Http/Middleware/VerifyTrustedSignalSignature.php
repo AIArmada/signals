@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Features\Ingestion\EntryPoints\Http\Middleware;
 
+use AIArmada\Signals\Features\Ingestion\Persistence\TrustedSignatureReplayStore;
 use Closure;
-use Illuminate\Cache\RateLimiter;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class VerifyTrustedSignalSignature
 {
-    public function __construct(private readonly RateLimiter $rateLimiter) {}
+    public function __construct(private readonly TrustedSignatureReplayStore $replayStore) {}
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -36,7 +36,9 @@ final class VerifyTrustedSignalSignature
         $timestamp = (int) $timestampHeader;
         $replayWindowSeconds = max(30, (int) config('signals.ingestion.trusted.replay_window_seconds', 300));
 
-        if (abs(time() - $timestamp) > $replayWindowSeconds) {
+        $now = time();
+
+        if (abs($now - $timestamp) > $replayWindowSeconds) {
             throw new HttpException(401, 'The Signals signature timestamp is outside the replay window.');
         }
 
@@ -56,9 +58,9 @@ final class VerifyTrustedSignalSignature
             throw new HttpException(401, 'The Signals signature is invalid.');
         }
 
-        $replayKey = 'signals:trusted:signature:' . hash('sha256', $timestampHeader . ':' . $providedSignature);
+        $remainingSeconds = max(1, $timestamp + $replayWindowSeconds - $now + 1);
 
-        if (! $this->rateLimiter->attempt($replayKey, 1, static fn (): bool => true, $replayWindowSeconds)) {
+        if (! $this->replayStore->reserve($timestampHeader, $providedSignature, $remainingSeconds)) {
             throw new HttpException(409, 'The trusted Signals request has already been processed.');
         }
 

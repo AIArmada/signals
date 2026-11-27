@@ -8,17 +8,36 @@ use AIArmada\CommerceSupport\Support\OwnerWriteGuard;
 use AIArmada\Signals\Features\Ingestion\Api\IngestedSignalEvent;
 use AIArmada\Signals\Features\Ingestion\Api\SignalIngestion;
 use AIArmada\Signals\Features\Ingestion\Models\TrackedProperty;
+use AIArmada\Signals\Features\Ingestion\Support\BrowserPayloadPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 final readonly class IngestSignal implements SignalIngestion
 {
-    public function __construct(private IngestSignalEvent $ingestSignalEvent) {}
+    public function __construct(
+        private IngestSignalEvent $ingestSignalEvent,
+        private BrowserPayloadPolicy $payloadPolicy,
+    ) {}
 
     public function handle(string $trackedPropertyId, array $payload, bool $trusted): IngestedSignalEvent
     {
         $trackedProperty = $this->resolveTrackedProperty($trackedPropertyId);
+
+        if (! $trackedProperty->is_active) {
+            throw new InvalidArgumentException('The tracked property is inactive.');
+        }
+
+        $eventName = $payload['event_name'] ?? null;
+
+        if (! is_string($eventName) || mb_trim($eventName) === '' || mb_strlen($eventName) > 255) {
+            throw new InvalidArgumentException('The event name must be a non-empty string of at most 255 characters.');
+        }
+
+        if (! $trusted) {
+            $this->payloadPolicy->assertStructure($payload, 'browser');
+            $this->payloadPolicy->assertEvent($eventName, $payload);
+        }
 
         $event = $this->ingestSignalEvent->handle($trackedProperty, $payload, $trusted);
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Features\Browser\EntryPoints\Http\Middleware;
 
-use AIArmada\Signals\Features\Browser\EntryPoints\Http\SignalsBrowserContextManager;
+use AIArmada\Signals\Support\Http\SignalsBrowserContextManager;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;

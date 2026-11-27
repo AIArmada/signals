@@ -7,6 +7,7 @@ namespace AIArmada\Signals\Features\Ingestion\Extensions;
 use AIArmada\CommerceSupport\Support\ConnectionDriver;
 use AIArmada\CommerceSupport\Support\LikeSearch;
 use AIArmada\Signals\Contracts\ReportInterface;
+use AIArmada\Signals\Features\Ingestion\Api\AcquisitionReportRead;
 use AIArmada\Signals\Features\Ingestion\Models\SignalEvent;
 use AIArmada\Signals\Features\Ingestion\Queries\SignalSegmentReportFilter;
 use AIArmada\Signals\Features\Reporting\Api\ReportConfiguration;
@@ -15,7 +16,7 @@ use AIArmada\Signals\Support\SignalReportRevenue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
-final class AcquisitionReportService implements ReportInterface
+final class AcquisitionReportService implements AcquisitionReportRead, ReportInterface
 {
     public function type(): string
     {

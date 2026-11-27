@@ -59,8 +59,7 @@ final readonly class IdentifySignalIdentity
                     // concurrent commit, and the merge must use the latest
                     // committed bounds. Nested callers own retry when their
                     // snapshot cannot be rescued.
-                    $locked = SignalIdentity::query()
-                        ->withoutOwnerScope()
+                    $locked = CrossTenantQuery::identitiesForProperty($trackedProperty)
                         ->whereKey($identity->getKey())
                         ->lockForUpdate()
                         ->first();
@@ -155,9 +154,7 @@ final readonly class IdentifySignalIdentity
      */
     private function resolveIdentity(TrackedProperty $trackedProperty, array $payload): SignalIdentity
     {
-        $query = SignalIdentity::query()
-            ->withoutOwnerScope()
-            ->where('tracked_property_id', $trackedProperty->id);
+        $query = CrossTenantQuery::identitiesForProperty($trackedProperty);
 
         if (($payload['external_id'] ?? null) !== null) {
             $existing = (clone $query)->where('external_id', $payload['external_id'])->first();

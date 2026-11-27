@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace AIArmada\Signals\Features\Ingestion\Extensions;
 
 use AIArmada\Signals\Contracts\ReportInterface;
+use AIArmada\Signals\Features\Ingestion\Api\LiveActivityReportRead;
 use AIArmada\Signals\Features\Ingestion\Models\SignalEvent;
 use AIArmada\Signals\Features\Ingestion\Queries\SignalSegmentReportFilter;
 use AIArmada\Signals\Support\SignalReportRevenue;
 use Illuminate\Database\Eloquent\Builder;
 
-final class LiveActivityReportService implements ReportInterface
+final class LiveActivityReportService implements LiveActivityReportRead, ReportInterface
 {
     public function type(): string
     {

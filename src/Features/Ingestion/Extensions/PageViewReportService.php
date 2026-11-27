@@ -9,7 +9,6 @@ use AIArmada\Signals\Features\Ingestion\Models\SignalEvent;
 use AIArmada\Signals\Features\Ingestion\Queries\SignalSegmentReportFilter;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 
 final class PageViewReportService implements ReportInterface
 {
@@ -58,7 +57,7 @@ final class PageViewReportService implements ReportInterface
             )
             ->with('trackedProperty')
             ->groupBy('tracked_property_id')
-            ->groupBy('path');
+            ->groupByRaw("COALESCE(path, '/')");
     }
 
     /**
@@ -66,12 +65,17 @@ final class PageViewReportService implements ReportInterface
      */
     public function summary(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null): array
     {
-        $query = $this->baseQuery($trackedPropertyId, $from, $until);
+        $row = $this->baseQuery($trackedPropertyId, $from, $until)
+            ->toBase()
+            ->selectRaw('COUNT(*) as total_page_views')
+            ->selectRaw('COUNT(DISTINCT COALESCE(signal_identity_id, signal_session_id, id)) as total_visitors')
+            ->selectRaw("COUNT(DISTINCT COALESCE(path, '/')) as total_pages")
+            ->first();
 
         return [
-            'total_page_views' => (int) (clone $query)->count(),
-            'total_visitors' => (int) (clone $query)->distinct()->count('signal_identity_id'),
-            'total_pages' => (int) (clone $query)->distinct()->count(DB::raw("COALESCE(path, '/')")),
+            'total_page_views' => (int) ($row->total_page_views ?? 0),
+            'total_visitors' => (int) ($row->total_visitors ?? 0),
+            'total_pages' => (int) ($row->total_pages ?? 0),
         ];
     }
 

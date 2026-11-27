@@ -6,8 +6,14 @@ namespace AIArmada\Signals\Features\Ingestion\Models;
 
 use AIArmada\CommerceSupport\Traits\HasOwner;
 use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
+use AIArmada\Signals\Features\Ingestion\Extensions\AcquisitionReportService;
+use AIArmada\Signals\Features\Ingestion\Extensions\ContentPerformanceReportService;
+use AIArmada\Signals\Features\Ingestion\Extensions\LiveActivityReportService;
+use AIArmada\Signals\Features\Ingestion\Extensions\PageViewReportService;
+use AIArmada\Signals\Features\Ingestion\Queries\SignalSegmentReportFilter;
 use AIArmada\Signals\Features\Ingestion\Support\SignalOwnershipGuard;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -89,6 +95,60 @@ final class SignalEvent extends Model
         'properties' => 'array',
         'property_types' => 'array',
     ];
+
+    /**
+     * @return Builder<SignalEvent>
+     */
+    public static function liveActivityRows(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null): Builder
+    {
+        return app(LiveActivityReportService::class)->getTableQuery($trackedPropertyId, $from, $until, $signalSegmentId);
+    }
+
+    /**
+     * @return Builder<SignalEvent>
+     */
+    public static function acquisitionRows(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null, ?string $attributionModel = null, ?string $savedReportId = null): Builder
+    {
+        return app(AcquisitionReportService::class)->getTableQuery($trackedPropertyId, $from, $until, $signalSegmentId, $attributionModel, $savedReportId);
+    }
+
+    /**
+     * @param  Builder<SignalEvent>  $query
+     * @return Builder<SignalEvent>
+     */
+    public static function applyAcquisitionCampaignSearch(Builder $query, string $search, ?string $attributionModel = null, ?string $savedReportId = null): Builder
+    {
+        return app(AcquisitionReportService::class)->applyCampaignSearch($query, $search, $attributionModel, $savedReportId);
+    }
+
+    /**
+     * @return Builder<SignalEvent>
+     */
+    public static function contentPerformanceRows(?string $trackedPropertyId = null, ?string $from = null, ?string $until = null, ?string $signalSegmentId = null, ?string $savedReportId = null): Builder
+    {
+        return app(ContentPerformanceReportService::class)->getTableQuery($trackedPropertyId, $from, $until, $signalSegmentId, $savedReportId);
+    }
+
+    /**
+     * @return Builder<SignalEvent>
+     */
+    public static function pageViewRows(
+        ?string $signalSegmentId = null,
+        ?string $trackedPropertyId = null,
+        ?CarbonImmutable $from = null,
+        ?CarbonImmutable $until = null,
+    ): Builder {
+        return app(PageViewReportService::class)->getTableQuery($signalSegmentId, $trackedPropertyId, $from, $until);
+    }
+
+    /**
+     * @param  Builder<SignalEvent>  $query
+     * @return Builder<SignalEvent>
+     */
+    public static function applyReportSegment(Builder $query, ?string $segmentId): Builder
+    {
+        return app(SignalSegmentReportFilter::class)->applyToEventQuery($query, $segmentId);
+    }
 
     public function getTable(): string
     {

@@ -38,7 +38,7 @@ return new class extends Migration
             $table->{$jsonColumnType}('property_types')->nullable();
             $table->timestampsTz();
 
-            $table->index(['tracked_property_id', 'occurred_at']);
+            $table->index(['tracked_property_id', 'occurred_at', 'id']);
             $table->index(['event_category', 'occurred_at']);
             $table->index(['event_name', 'occurred_at']);
             $table->index(['signal_session_id', 'id']);

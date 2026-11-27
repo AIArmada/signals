@@ -26,6 +26,9 @@
     "table:signal_interaction_rules": [
       "AIArmada\\Signals\\Features\\Ingestion\\Actions\\CleanUpTrackedProperty",
       "AIArmada\\Signals\\Features\\Ingestion\\Actions\\AdministerInteractionRule"
+    ],
+    "store:signals:trusted:signature": [
+      "AIArmada\\Signals\\Features\\Ingestion\\Persistence\\TrustedSignatureReplayStore"
     ]
   },
   "extensions": {
