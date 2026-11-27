@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Support;
 
-use AIArmada\Signals\Models\SignalEvent;
-use AIArmada\Signals\Models\TrackedProperty;
+use AIArmada\Signals\Features\Ingestion\Api\TelemetryRead;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use stdClass;
 
 /**
@@ -42,16 +42,13 @@ final class SignalReportRevenue
             return SignalCurrency::default();
         }
 
-        $property = TrackedProperty::query()
-            ->forOwner()
-            ->whereKey($trackedPropertyId)
-            ->first();
-
-        return SignalCurrency::code($property?->currency);
+        return app(TelemetryRead::class)->propertyCurrency($trackedPropertyId) ?? SignalCurrency::default();
     }
 
     /**
-     * @param  Builder<SignalEvent>  $query
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
      * @return array<string, int>
      */
     public static function byCurrency(Builder $query): array
@@ -67,7 +64,9 @@ final class SignalReportRevenue
     }
 
     /**
-     * @param  Builder<SignalEvent>  $query
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
      */
     public static function sumForCurrency(Builder $query, string $currency): int
     {
@@ -78,14 +77,16 @@ final class SignalReportRevenue
 
     /**
      * SQL aggregate summing event revenue only when the event currency
-     * matches its tracked property's reporting currency. Legacy
+     * matches its tracked property's reporting currency. Unexpected
      * foreign-currency rows contribute zero instead of silently merging
      * into the property total.
      */
     public static function conditionalRevenueExpression(): string
     {
-        $events = (new SignalEvent)->getTable();
-        $properties = (new TrackedProperty)->getTable();
+        $tables = config('signals.database.tables', []);
+        $prefix = config('signals.database.table_prefix', 'signal_');
+        $events = $tables['events'] ?? $prefix . 'events';
+        $properties = $tables['tracked_properties'] ?? $prefix . 'tracked_properties';
 
         return sprintf(
             "SUM(CASE WHEN UPPER(%1\$s.currency) = COALESCE((SELECT UPPER(%2\$s.currency) FROM %2\$s WHERE %2\$s.id = %1\$s.tracked_property_id), '') THEN %1\$s.revenue_minor ELSE 0 END)",

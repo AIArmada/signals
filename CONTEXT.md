@@ -18,7 +18,7 @@ keywords:
 - Composer: `aiarmada/signals`
 - Role: Privacy-first behavioural analytics: ingestion, sessions, rollups, goals, alerts, reports.
 - Triggers: analytics, event-tracking, funnel, session, alert
-- Search first: `src/Models, src/Actions, src/Services, config, docs`
+- Search first: `src/Features, src/Support, src/Platform, config, docs`
 - Related: `filament-signals`, `growth`, `cart`, `checkout`, `orders`, `affiliates`, `links`
 - Paired: `filament-signals` (Filament admin adapter)
 
@@ -42,7 +42,7 @@ keywords:
 
 ## Key surfaces
 - Models: `SavedSignalReport`, `SignalAlertDelivery`, `SignalAlertLog`, `SignalAlertRule`, `SignalDailyMetric`, `SignalEvent`, `SignalGoal`, `SignalIdentity`, `SignalInteractionRule`, `SignalSegment`, `SignalSession`, `TrackedProperty`
-- Actions/Services: `Actions/CaptureSignalGeolocation`, `Actions/CaptureSignalPageView`, `Actions/EvaluateAlertRules`, `Actions/IdentifySignalIdentity`, `Actions/IngestSignalEvent`, `Actions/IngestTrustedSignalOutcome`, `Actions/MarkAllSignalAlertsAsRead`, `Actions/MarkSignalAlertAsRead`
+- Feature boundaries: `Features/Ingestion`, `Features/Reporting`, `Features/Alerts`, `Features/Browser`. Use each feature's `Api` for cross-feature calls; mutations belong in `Actions`.
 - Config `signals.php`: `database`, `table_prefix`, `json_column_type`, `tables`, `tracked_properties`, `identities`, `sessions`, `events`, `interaction_rules`, `daily_metrics`
 
 ## Docs map

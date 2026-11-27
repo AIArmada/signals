@@ -26,7 +26,7 @@ return new class extends Migration
             $table->{$jsonColumnType}('event_filters')->nullable();
             $table->{$jsonColumnType}('channels')->nullable();
             $table->{$jsonColumnType}('destination_keys')->nullable();
-            $table->{$jsonColumnType}('inline_destinations')->nullable();
+            $table->text('inline_destinations')->nullable();
             $table->unsignedInteger('timeframe_minutes')->default(60);
             $table->unsignedInteger('cooldown_minutes')->default(60);
             $table->string('severity')->default('warning');

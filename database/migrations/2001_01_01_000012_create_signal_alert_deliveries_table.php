@@ -11,14 +11,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create(config('signals.database.tables.alert_deliveries', 'signal_alert_deliveries'), function (Blueprint $table): void {
-            $jsonColumnType = commerce_json_column_type('signals', 'jsonb');
-
             $table->uuid('id')->primary();
             $table->nullableUuidMorphs('owner');
             $table->foreignUuid('signal_alert_log_id');
             $table->string('channel', 32);
             $table->string('destination_key', 128);
-            $table->{$jsonColumnType}('destination');
+            $table->text('destination');
             $table->string('status', 24)->default('pending');
             $table->unsignedSmallInteger('attempt_count')->default(0);
             $table->unsignedSmallInteger('max_attempts')->default(5);

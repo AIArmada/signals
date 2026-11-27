@@ -30,12 +30,12 @@ The `aiarmada/signals` package is the analytics foundation for Commerce. It owns
 
 ## Main models services or surfaces
 
-- **Actions** — `IngestSignalEvent`, `ResolveSession`, `EvaluateAlertRules`, `IdentifySignalIdentity`, `CaptureSignalPageView`, `CaptureSignalGeolocation`, `ServeSignalsTracker`, and alert-read actions
-- **Contracts** — `BrowserContextResolverInterface`, `ReportInterface`, `ReverseGeocoderContract`, `SignalEventIngestor`, `SignalLocationResolverContract`
+- **Actions** — `IngestSignalEvent`, `ResolveSession`, `EvaluateAlertRules`, `IdentifySignalIdentity`, `CaptureSignalPageView`, `CaptureSignalGeolocation`, `TrackerScriptController`, and alert-read actions
+- **Contracts** — `BrowserContextResolverInterface`, `ReportInterface`, `ReverseGeocoderContract`, `IngestSignalEvent`, `SignalLocationResolverContract`
 - **Ingestion surface** — HTTP actions for identity, page-view, custom-event capture, geolocation capture, and tracker-script delivery
 - **Browser surface** — browser-context cookies, optional automatic tracker injection, and Blade `@signalsTracker` rendering
-- **Models and services** — signals domain models, report services (`PageViewReportService`, `SignalsDashboardService`, funnel/acquisition/journey/retention/content/goals/live/devices), alerting, ingestion helpers, route catalogs, and daily aggregation
-- **ReportRegistry** — central registry for `ReportInterface` implementations, used by `SignalsDashboardService` and Filament admin surfaces
+- **Models and services** — signals domain models, report services (`PageViewReportService`, `DashboardRead`, funnel/acquisition/journey/retention/content/goals/live/devices), alerting, ingestion helpers, route catalogs, and daily aggregation
+- **ReportRegistry** — central registry for `ReportInterface` implementations, used by `DashboardRead` and Filament admin surfaces
 - **Integration surface** — `CommerceSignalsRecorder`, `CommerceSignalsIntegrationRegistrar`, and per-event listeners for cart, checkout, orders, vouchers, and affiliates
 
 ## Owner scoping and security notes
@@ -82,18 +82,20 @@ When browser integration is enabled, Signals can also auto-create a browser trac
 
 ```text
 src/
-├── Actions/                 # Laravel Actions for ingest, session, alerts, identity, page views
-├── Console/Commands/        # Daily aggregation + alert processing
-├── Contracts/               # BrowserContextResolverInterface, ReportInterface
-├── Data/                    # Spatie DTOs
-├── Jobs/                    # Queued jobs (reverse geocode, alert evaluation)
-├── Listeners/               # Commerce integration listeners
-├── Models/                  # Signals domain models
-├── Reports/                 # ReportRegistry for pluggable report types
-├── Services/                # Reporting, dashboards, alerting, ingestion helpers, geocoding
-├── Support/                 # Browser context, CrossTenantQuery, integration registrar, middleware
+├── Contracts/             # Package-wide integration contracts
+├── Data/                  # Immutable data objects
+├── Drivers/               # External geocoding, device parsing and alert transport
+├── Features/
+│   ├── Ingestion/         # Properties, identities, sessions, events and interaction rules
+│   ├── Reporting/         # Rollups, reports, goals, segments and saved reports
+│   ├── Alerts/            # Alert rules, logs and delivery
+│   └── Browser/           # Context middleware and tracker rendering
+├── Platform/              # Feature discovery and extension registration
+├── Support/
 └── SignalsServiceProvider.php
 ```
+
+Each feature owns its tables and write actions in its feature manifest. Use feature APIs for cross-feature reads and mutations. Dashboard reads use `AIArmada\Signals\Features\Reporting\Api\DashboardRead` with a property ID, not a model instance.
 
 ## Requirements
 

@@ -56,7 +56,7 @@ $revenueByCurrency = SignalReportRevenue::byCurrency($query);
 `SignalRouteCatalog` can convert named routes into path conditions that are safe to reuse in reports or segments:
 
 ```php
-use AIArmada\Signals\Services\SignalRouteCatalog;
+use AIArmada\Signals\Support\SignalRouteCatalog;
 
 // Returns null for unknown or ineligible routes.
 $condition = app(SignalRouteCatalog::class)->conditionForRouteName('pricing.show');
@@ -97,7 +97,16 @@ Supported dispatch channels:
 - webhook,
 - Slack-compatible webhook.
 
-Named destinations from config are preferred. Inline destinations are ignored unless explicitly enabled.
+Named destinations from config are preferred. Inline destinations are ignored unless explicitly enabled. With owner scoping enabled, global rules can use named destinations and tenant rules can use inline destinations. Inline rule destinations and queued delivery destinations are encrypted at rest. Inline rule destinations are excluded from audits, activity logs, and model serialization. Each inline entry declares its channel and destination fields.
+
+```php
+'inline_destinations' => [
+    ['channel' => 'email', 'destination' => ['to' => 'ops@example.com']],
+    ['channel' => 'slack', 'destination' => ['webhook_url' => 'https://hooks.slack.com/services/...']],
+],
+```
+
+Delivery retries retain the specific sanitized failure code (`http_5xx`, `timeout`, `invalid_destination`, `unsafe_destination`, `unsupported_channel`). A worker that finds an active lease releases the queued job until the lease expires instead of acknowledging it, and a delivery whose alert log was already deleted is removed rather than retried.
 
 ## Evaluation strategy
 
@@ -115,7 +124,7 @@ Report, alert, and command paths are owner-scoped. Global rows require explicit 
 
 ## ReportRegistry
 
-Signals uses a `ReportRegistry` to manage pluggable report types. Reports are registered in `SignalsServiceProvider` via anonymous classes implementing `ReportInterface`:
+Signals uses a `ReportRegistry` to manage pluggable report types. Telemetry-backed reports are declared in the Ingestion feature manifest and registered by the Reporting feature module via anonymous classes implementing `ReportInterface`:
 
 | Report Type | Backing Service |
 |---|---|
@@ -129,20 +138,17 @@ Signals uses a `ReportRegistry` to manage pluggable report types. Reports are re
 | `goals` | `GoalsReportService` |
 | `live_activity` | `LiveActivityReportService` |
 
-The registry is consumed by `SignalsDashboardService` and Filament admin surfaces. Each report implements `summary(?string $trackedPropertyId, ?string $from, ?string $until): array`, making the same data available outside the admin UI:
+The registry is consumed by the Reporting feature's `DashboardRead` implementation. Each report implements `summary(?string $trackedPropertyId, ?string $from, ?string $until): array`, making the same data available outside the admin UI:
 
 ```php
-use AIArmada\Signals\Reports\ReportRegistry;
+use AIArmada\Signals\Features\Reporting\Api\DashboardRead;
 
-$registry = app(ReportRegistry::class);
+$dashboard = app(DashboardRead::class);
+$summary = $dashboard->report('page_view', trackedPropertyId: $property->id);
 
-/** @var \AIArmada\Signals\Contracts\ReportInterface $report */
-$report = $registry->get('page_view');
-$summary = $report->summary(trackedPropertyId: $property->id);
-
-foreach ($registry->all() as $report) {
-    $data = $report->summary();
+foreach ($dashboard->availableReports() as $type => $name) {
+    $data = $dashboard->report($type);
 }
 ```
 
-To add a custom report, implement `ReportInterface` and register it on the `ReportRegistry` singleton in your service provider.
+To add a custom report, implement `ReportInterface` and register it on the Reporting feature's `ReportRegistry` singleton in your service provider. Built-in telemetry readers implement the interface directly and are discovered through the `signals.reports` extension slot.

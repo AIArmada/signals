@@ -1,0 +1,244 @@
+<?php
+
+declare(strict_types=1);
+
+namespace AIArmada\Signals\Features\Alerts\Models;
+
+use AIArmada\CommerceSupport\Concerns\HasCommerceAudit;
+use AIArmada\CommerceSupport\Concerns\LogsCommerceActivity;
+use AIArmada\CommerceSupport\Support\OwnerContext;
+use AIArmada\CommerceSupport\Support\SensitiveAttributes;
+use AIArmada\CommerceSupport\Traits\HasOwner;
+use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
+use AIArmada\CommerceSupport\Traits\HasOwnerScopeKey;
+use AIArmada\Signals\Features\Alerts\Actions\DeleteAlertRuleHistory;
+use AIArmada\Signals\Features\Ingestion\Api\TelemetryRead;
+use AIArmada\Signals\Support\SignalCurrency;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
+use OwenIt\Auditing\Contracts\Auditable;
+use RuntimeException;
+
+/**
+ * @property string $id
+ * @property string|null $owner_type
+ * @property string|null $owner_id
+ * @property string $owner_scope
+ * @property string|null $tracked_property_id
+ * @property string $name
+ * @property string $slug
+ * @property string|null $description
+ * @property string $metric_key
+ * @property string $operator
+ * @property float $threshold
+ * @property array<string, mixed>|null $event_filters
+ * @property array<int, string>|null $channels
+ * @property array<int, string>|null $destination_keys
+ * @property array<string, mixed>|null $inline_destinations
+ * @property int $timeframe_minutes
+ * @property int $cooldown_minutes
+ * @property string $severity
+ * @property int $priority
+ * @property Carbon|null $last_triggered_at
+ * @property bool $is_active
+ * @property-read Collection<int, SignalAlertLog> $logs
+ */
+final class SignalAlertRule extends Model implements Auditable
+{
+    use HasCommerceAudit;
+    use HasOwner;
+    use HasOwnerScopeConfig;
+    use HasOwnerScopeKey;
+    use HasUuids;
+    use LogsCommerceActivity;
+
+    protected $table = 'signal_alert_rules';
+
+    protected static string $ownerScopeConfigKey = 'signals.owner';
+
+    /** @var list<string> */
+    protected $hidden = [
+        'owner_scope',
+        'inline_destinations',
+    ];
+
+    /** @var list<string> */
+    protected $fillable = [
+        'tracked_property_id',
+        'name',
+        'slug',
+        'description',
+        'metric_key',
+        'operator',
+        'threshold',
+        'event_filters',
+        'channels',
+        'destination_keys',
+        'inline_destinations',
+        'timeframe_minutes',
+        'cooldown_minutes',
+        'severity',
+        'priority',
+        'last_triggered_at',
+        'is_active',
+        'owner_type',
+        'owner_id',
+    ];
+
+    public function getAuditInclude(): array
+    {
+        return [
+            'tracked_property_id',
+            'name',
+            'slug',
+            'description',
+            'metric_key',
+            'operator',
+            'threshold',
+            'event_filters',
+            'channels',
+            'destination_keys',
+            'timeframe_minutes',
+            'cooldown_minutes',
+            'severity',
+            'priority',
+            'last_triggered_at',
+            'is_active',
+            'owner_type',
+            'owner_id',
+        ];
+    }
+
+    public function getTable(): string
+    {
+        $tables = config('signals.database.tables', []);
+        $prefix = config('signals.database.table_prefix', 'signal_');
+
+        return $tables['alert_rules'] ?? $prefix . 'alert_rules';
+    }
+
+    /**
+     * @return HasMany<SignalAlertLog, $this>
+     */
+    public function logs(): HasMany
+    {
+        return $this->hasMany(SignalAlertLog::class, 'signal_alert_rule_id');
+    }
+
+    public function isInCooldown(): bool
+    {
+        if ($this->last_triggered_at === null) {
+            return false;
+        }
+
+        return $this->last_triggered_at->copy()->addMinutes($this->cooldown_minutes)->isFuture();
+    }
+
+    public function getCooldownRemainingMinutes(): int
+    {
+        if (! $this->isInCooldown() || $this->last_triggered_at === null) {
+            return 0;
+        }
+
+        return (int) CarbonImmutable::now()->diffInMinutes($this->last_triggered_at->copy()->addMinutes($this->cooldown_minutes));
+    }
+
+    /**
+     * Currency code the rule's revenue metric is evaluated in.
+     *
+     * Property-scoped rules inherit the property reporting currency.
+     * Global rules must declare the currency through `event_filters.currency`.
+     */
+    public function revenueCurrency(): ?string
+    {
+        if ($this->metric_key !== 'revenue_minor') {
+            return null;
+        }
+
+        if (filled($this->tracked_property_id)) {
+            return app(TelemetryRead::class)->propertyCurrency((string) $this->tracked_property_id);
+        }
+
+        return SignalCurrency::normalize($this->event_filters['currency'] ?? null);
+    }
+
+    public static function ownerScopingEnabled(): bool
+    {
+        return static::resolveOwnerScopeConfig()->enabled;
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (SignalAlertRule $rule): void {
+            if (
+                $rule->metric_key === 'revenue_minor'
+                && ! filled($rule->tracked_property_id)
+                && SignalCurrency::normalize($rule->event_filters['currency'] ?? null) === null
+            ) {
+                throw new RuntimeException('Revenue alert rules without a tracked property require an explicit currency in event_filters.');
+            }
+
+            if (! self::ownerScopingEnabled()) {
+                return;
+            }
+
+            $owner = OwnerContext::resolve();
+
+            OwnerContext::assertResolvedOrExplicitGlobal(
+                $owner,
+                'Owner scoping is enabled but no owner was resolved while saving a signal alert rule.',
+            );
+
+            if ($rule->tracked_property_id !== '' && $rule->tracked_property_id !== null) {
+                $exists = app(TelemetryRead::class)->propertyCurrency((string) $rule->tracked_property_id) !== null;
+
+                if (! $exists) {
+                    throw new RuntimeException('Invalid tracked_property_id: does not belong to the current owner scope.');
+                }
+            }
+        });
+
+        static::deleting(function (SignalAlertRule $rule): void {
+            app(DeleteAlertRuleHistory::class)->handle($rule);
+        });
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'threshold' => 'float',
+            'event_filters' => 'array',
+            'channels' => 'array',
+            'destination_keys' => 'array',
+            'inline_destinations' => 'encrypted:array',
+            'timeframe_minutes' => 'integer',
+            'cooldown_minutes' => 'integer',
+            'priority' => 'integer',
+            'last_triggered_at' => 'immutable_datetime',
+            'is_active' => 'boolean',
+        ];
+    }
+
+    protected function getActivityLogName(): string
+    {
+        return 'signals';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function getLoggableAttributes(): array
+    {
+        return array_values(array_diff(
+            SensitiveAttributes::exclude($this->fillable),
+            ['inline_destinations'],
+        ));
+    }
+}

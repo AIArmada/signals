@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Data;
 
-use Illuminate\Http\Request;
-
 final readonly class TrustedSignalOutcomeData
 {
     /** @param array<string, mixed>|null $properties */
@@ -23,21 +21,9 @@ final readonly class TrustedSignalOutcomeData
         public ?array $properties,
     ) {}
 
-    public static function fromRequest(Request $request): self
+    /** @param array<string, mixed> $payload */
+    public static function fromPayload(array $payload): self
     {
-        $payload = $request->validate([
-            'write_key' => ['required', 'string', 'max:255'],
-            'event_name' => ['required', 'string', 'max:255'],
-            'event_category' => ['required', 'string', 'max:100'],
-            'idempotency_key' => ['required', 'string', 'max:255'],
-            'transaction_id' => ['required', 'string', 'max:255'],
-            'revenue_minor' => ['required', 'integer', 'min:0'],
-            'currency' => ['required', 'string', 'size:3'],
-            'external_id' => ['nullable', 'string', 'max:255'],
-            'anonymous_id' => ['nullable', 'string', 'max:255'],
-            'occurred_at' => ['nullable', 'date'],
-            'properties' => ['nullable', 'array'],
-        ]);
 
         return new self(
             writeKey: (string) $payload['write_key'],

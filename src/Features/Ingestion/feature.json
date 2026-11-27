@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "name": "Ingestion",
+  "owns": {
+    "table:signal_events": [
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\IngestSignalEvent",
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\CleanUpTrackedProperty",
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\DetachDeletedTelemetry"
+    ],
+    "table:signal_identities": [
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\IdentifySignalIdentity",
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\CleanUpTrackedProperty"
+    ],
+    "table:signal_sessions": [
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\ResolveSession",
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\IngestSignalEvent",
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\CaptureSignalGeolocation",
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\SignalLocationResolverPipeline",
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\CleanUpTrackedProperty",
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\DetachDeletedTelemetry"
+    ],
+    "table:signal_tracked_properties": [
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\ResolveTrackedProperty",
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\AdministerTrackedProperty"
+    ],
+    "table:signal_interaction_rules": [
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\CleanUpTrackedProperty",
+      "AIArmada\\Signals\\Features\\Ingestion\\Actions\\AdministerInteractionRule"
+    ]
+  },
+  "extensions": {
+    "signals.reports": [
+      "AIArmada\\Signals\\Features\\Ingestion\\Extensions\\AcquisitionReportService",
+      "AIArmada\\Signals\\Features\\Ingestion\\Extensions\\ConversionFunnelReportService",
+      "AIArmada\\Signals\\Features\\Ingestion\\Extensions\\RetentionReportService",
+      "AIArmada\\Signals\\Features\\Ingestion\\Extensions\\JourneyReportService",
+      "AIArmada\\Signals\\Features\\Ingestion\\Extensions\\PageViewReportService",
+      "AIArmada\\Signals\\Features\\Ingestion\\Extensions\\ContentPerformanceReportService",
+      "AIArmada\\Signals\\Features\\Ingestion\\Extensions\\DevicesReportService",
+      "AIArmada\\Signals\\Features\\Ingestion\\Extensions\\GoalsReportService",
+      "AIArmada\\Signals\\Features\\Ingestion\\Extensions\\LiveActivityReportService"
+    ]
+  }
+}

@@ -10,7 +10,7 @@ namespace AIArmada\Signals\Data;
  * All string fields may be null when the provider does not supply that level
  * of detail for the queried coordinate.
  */
-readonly class GeocodingResult
+final readonly class GeocodingResult
 {
     public function __construct(
         /** ISO 3166-1 alpha-2 country code (e.g. "MY") */

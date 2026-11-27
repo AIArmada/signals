@@ -91,6 +91,8 @@ These toggles let you suppress specific built-in commerce recordings without dis
 
 Owner mode is opt-in for Signals. With the default config, browser/global analytics can run without a resolved owner. Once you enable owner mode, tracked-property resolution, writes, and admin queries follow the configured owner boundary and require either a resolved owner or explicit global context.
 
+`include_global` applies to scoped reads and dashboard metrics: when true, tenant queries include ownerless global rows. Filter option lists, reference guards, and mutations remain tenant-only; global rows still require explicit global context for writes.
+
 Telemetry integrity always applies: referenced properties, sessions, and identities must exist, `tracked_property_id` is immutable once persisted for identities, sessions, and events, and events/sessions reject missing or cross-property session/identity references even when owner scoping is disabled. Disabling owner mode only disables tenant authorization, not dangling-reference protection. When owner mode is enabled, every child-model write is additionally ownership-validated: identities, sessions, events, daily metrics, interaction rules, and alert deliveries reject foreign `tracked_property_id` / `signal_alert_log_id` references with an authorization failure. Explicit global context may only reference global-only rows.
 
 ## Ingestion
@@ -268,6 +270,15 @@ Property filtering is recursive. The blocklist is applied to every nested map an
 ```
 
 Scheduled alert evaluation (`signals:process-alerts`) is the baseline. On-ingest evaluation is optional and queued by default. Named destinations in `destinations.*` are referenced by key in alert rules; inline destinations are ignored unless `allow_inline_destinations` is true.
+
+When owner scoping is enabled, named destinations are reserved for global alert rules. Tenant alert rules use inline destinations, which are stored encrypted and excluded from audits, activity logs, and model serialization. Inline destinations are a list of `channel` and `destination` entries:
+
+```php
+'inline_destinations' => [
+    ['channel' => 'email', 'destination' => ['to' => 'ops@example.com']],
+    ['channel' => 'webhook', 'destination' => ['url' => 'https://example.com/hooks/signals']],
+],
+```
 
 Webhook and Slack destinations must be public `http` or `https` URLs on standard ports. Credentials in URLs, private/reserved IP addresses, internal hostnames, and redirects are rejected to prevent server-side requests from reaching internal services.
 

@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "name": "Alerts",
+  "owns": {
+    "table:signal_alert_rules": [
+      "AIArmada\\Signals\\Features\\Alerts\\Actions\\SignalAlertDispatcher",
+      "AIArmada\\Signals\\Features\\Alerts\\Actions\\DetachAlertsFromProperty",
+      "AIArmada\\Signals\\Features\\Alerts\\Actions\\AdministerAlertRule"
+    ],
+    "table:signal_alert_logs": [
+      "AIArmada\\Signals\\Features\\Alerts\\Actions\\SignalAlertDispatcher",
+      "AIArmada\\Signals\\Features\\Alerts\\Actions\\SetAlertReadState",
+      "AIArmada\\Signals\\Features\\Alerts\\Actions\\DetachAlertsFromProperty",
+      "AIArmada\\Signals\\Features\\Alerts\\Actions\\DeleteAlertRuleHistory",
+      "AIArmada\\Signals\\Features\\Alerts\\Actions\\DeleteAlertLog"
+    ],
+    "table:signal_alert_deliveries": [
+      "AIArmada\\Signals\\Features\\Alerts\\Actions\\SignalAlertDispatcher",
+      "AIArmada\\Signals\\Features\\Alerts\\Actions\\ProcessAlertDelivery",
+      "AIArmada\\Signals\\Features\\Alerts\\Actions\\DeleteAlertRuleHistory",
+      "AIArmada\\Signals\\Features\\Alerts\\Actions\\DeleteAlertLog"
+    ]
+  },
+  "extensions": {}
+}

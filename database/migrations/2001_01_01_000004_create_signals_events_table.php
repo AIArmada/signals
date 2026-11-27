@@ -41,6 +41,8 @@ return new class extends Migration
             $table->index(['tracked_property_id', 'occurred_at']);
             $table->index(['event_category', 'occurred_at']);
             $table->index(['event_name', 'occurred_at']);
+            $table->index(['signal_session_id', 'id']);
+            $table->index('signal_identity_id');
             $table->unique(['tracked_property_id', 'ingestion_source', 'idempotency_key'], 'signal_events_idem_unique');
             $table->index(['tracked_property_id', 'source_event_id']);
             $table->index(['source', 'campaign']);

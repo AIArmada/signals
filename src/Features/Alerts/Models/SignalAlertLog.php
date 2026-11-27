@@ -1,0 +1,140 @@
+<?php
+
+declare(strict_types=1);
+
+namespace AIArmada\Signals\Features\Alerts\Models;
+
+use AIArmada\CommerceSupport\Support\OwnerContext;
+use AIArmada\CommerceSupport\Traits\HasOwner;
+use AIArmada\CommerceSupport\Traits\HasOwnerScopeConfig;
+use AIArmada\Signals\Features\Ingestion\Api\TelemetryRead;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
+use RuntimeException;
+
+/**
+ * @property string $id
+ * @property string|null $owner_type
+ * @property string|null $owner_id
+ * @property string $signal_alert_rule_id
+ * @property string|null $tracked_property_id
+ * @property string $metric_key
+ * @property string $operator
+ * @property float $metric_value
+ * @property float $threshold_value
+ * @property string $severity
+ * @property string $title
+ * @property string|null $message
+ * @property array<string, mixed>|null $context
+ * @property array<int, string>|null $channels_notified
+ * @property array<string, mixed>|null $delivery_results
+ * @property Carbon|null $read_at
+ * @property-read SignalAlertRule $alertRule
+ */
+final class SignalAlertLog extends Model
+{
+    use HasOwner;
+    use HasOwnerScopeConfig;
+    use HasUuids;
+
+    protected $table = 'signal_alert_logs';
+
+    protected static string $ownerScopeConfigKey = 'signals.owner';
+
+    /** @var list<string> */
+    protected $fillable = [
+        'signal_alert_rule_id',
+        'tracked_property_id',
+        'metric_key',
+        'operator',
+        'metric_value',
+        'threshold_value',
+        'severity',
+        'title',
+        'message',
+        'context',
+        'channels_notified',
+        'delivery_results',
+        'read_at',
+        'owner_type',
+        'owner_id',
+    ];
+
+    public function getTable(): string
+    {
+        $tables = config('signals.database.tables', []);
+        $prefix = config('signals.database.table_prefix', 'signal_');
+
+        return $tables['alert_logs'] ?? $prefix . 'alert_logs';
+    }
+
+    /**
+     * @return BelongsTo<SignalAlertRule, $this>
+     */
+    public function alertRule(): BelongsTo
+    {
+        return $this->belongsTo(SignalAlertRule::class, 'signal_alert_rule_id');
+    }
+
+    /** @return HasMany<SignalAlertDelivery, $this> */
+    public function deliveries(): HasMany
+    {
+        return $this->hasMany(SignalAlertDelivery::class, 'signal_alert_log_id');
+    }
+
+    public static function ownerScopingEnabled(): bool
+    {
+        return static::resolveOwnerScopeConfig()->enabled;
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (SignalAlertLog $log): void {
+            if (! self::ownerScopingEnabled()) {
+                return;
+            }
+
+            $owner = OwnerContext::resolve();
+
+            OwnerContext::assertResolvedOrExplicitGlobal(
+                $owner,
+                'Owner scoping is enabled but no owner was resolved while saving a signal alert log.',
+            );
+
+            $ruleExists = SignalAlertRule::query()
+                ->forOwner($owner, includeGlobal: false)
+                ->whereKey($log->signal_alert_rule_id)
+                ->exists();
+
+            if (! $ruleExists) {
+                throw new RuntimeException('Invalid signal_alert_rule_id: does not belong to the current owner scope.');
+            }
+
+            if ($log->tracked_property_id !== '' && $log->tracked_property_id !== null) {
+                $propertyExists = app(TelemetryRead::class)->propertyCurrency((string) $log->tracked_property_id) !== null;
+
+                if (! $propertyExists) {
+                    throw new RuntimeException('Invalid tracked_property_id: does not belong to the current owner scope.');
+                }
+            }
+        });
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'metric_value' => 'float',
+            'threshold_value' => 'float',
+            'context' => 'array',
+            'channels_notified' => 'array',
+            'delivery_results' => 'array',
+            'read_at' => 'immutable_datetime',
+        ];
+    }
+}

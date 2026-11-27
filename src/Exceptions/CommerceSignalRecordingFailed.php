@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace AIArmada\Signals\Exceptions;
 
-use AIArmada\Signals\Models\SignalEvent;
-use AIArmada\Signals\Models\TrackedProperty;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -65,24 +63,25 @@ final class CommerceSignalRecordingFailed extends RuntimeException
     }
 
     public static function forAlertEvaluation(
-        SignalEvent $event,
-        TrackedProperty $trackedProperty,
+        string $eventId,
+        string $trackedPropertyId,
+        mixed $ownerType,
+        mixed $ownerId,
         Throwable $previous,
     ): self {
-        $attributes = $event->getAttributes();
 
         return new self(
             sprintf(
                 'Signal alert evaluation failed for persisted event [%s] (%s; see previous exception for details).',
-                (string) $event->getKey(),
+                $eventId,
                 $previous::class,
             ),
             array_filter([
                 'phase' => 'alert_evaluation',
-                'signal_event_id' => $event->getKey(),
-                'tracked_property_id' => $trackedProperty->getKey(),
-                'owner_type' => self::rawScalar($attributes, 'owner_type'),
-                'owner_id' => self::rawScalar($attributes, 'owner_id'),
+                'signal_event_id' => $eventId,
+                'tracked_property_id' => $trackedPropertyId,
+                'owner_type' => self::rawScalar($ownerType),
+                'owner_id' => self::rawScalar($ownerId),
             ], static fn (mixed $value): bool => $value !== null),
             $previous,
         );
@@ -117,15 +116,12 @@ final class CommerceSignalRecordingFailed extends RuntimeException
         return Str::snake($segments[1]);
     }
 
-    /**
-     * @param  array<string, mixed>  $attributes
-     */
-    private static function rawScalar(array $attributes, string $key): ?string
+    private static function rawScalar(mixed $value): ?string
     {
-        if (! array_key_exists($key, $attributes) || ! is_scalar($attributes[$key]) || is_bool($attributes[$key])) {
+        if (! is_scalar($value) || is_bool($value)) {
             return null;
         }
 
-        return (string) $attributes[$key];
+        return (string) $value;
     }
 }
