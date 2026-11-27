@@ -9,6 +9,7 @@ use AIArmada\Signals\Contracts\SignalLocationResolverContract;
 use AIArmada\Signals\Features\Ingestion\Actions\AdministerInteractionRule;
 use AIArmada\Signals\Features\Ingestion\Actions\AdministerTrackedProperty;
 use AIArmada\Signals\Features\Ingestion\Actions\CommerceSignalsRecorder;
+use AIArmada\Signals\Features\Ingestion\Actions\IngestSignal;
 use AIArmada\Signals\Features\Ingestion\Actions\ResolveBrowserProperty;
 use AIArmada\Signals\Features\Ingestion\Actions\SignalLocationResolverPipeline;
 use AIArmada\Signals\Features\Ingestion\Api\BrowserInteractionRules;
@@ -18,6 +19,7 @@ use AIArmada\Signals\Features\Ingestion\Api\EventMetricQuery;
 use AIArmada\Signals\Features\Ingestion\Api\EventPropertyLookup;
 use AIArmada\Signals\Features\Ingestion\Api\InteractionRuleAdministration;
 use AIArmada\Signals\Features\Ingestion\Api\PropertyAdministration;
+use AIArmada\Signals\Features\Ingestion\Api\SignalIngestion;
 use AIArmada\Signals\Features\Ingestion\Api\TelemetryRead;
 use AIArmada\Signals\Features\Ingestion\Queries\ActiveBrowserInteractionRules;
 use AIArmada\Signals\Features\Ingestion\Queries\CalculateEventMetric;
@@ -39,6 +41,7 @@ final class FeatureModule implements FeatureModuleContract
         $app->bind(EventMetricQuery::class, CalculateEventMetric::class);
         $app->bind(InteractionRuleAdministration::class, AdministerInteractionRule::class);
         $app->bind(PropertyAdministration::class, AdministerTrackedProperty::class);
+        $app->bind(SignalIngestion::class, IngestSignal::class);
         $app->singleton(CommerceSignalsRecorder::class);
         $app->bind(BrowserPropertyResolver::class, ResolveBrowserProperty::class);
         $app->singleton(SignalLocationResolverPipeline::class, function ($app): SignalLocationResolverPipeline {

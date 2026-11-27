@@ -322,6 +322,32 @@ Field mapping lives in per-source recorders (`AIArmada\Signals\Features\Ingestio
 > **warning**
 > Automatic-listener failure behavior changed. A malformed trusted source dispatched as a domain event no longer throws to the caller; it is reported and skipped. Callers that require synchronous validation must invoke the strict recorder (`CommerceSignalsRecorder`) explicitly instead of relying on listener exceptions.
 
+### Direct application ingestion
+
+Use the public `SignalIngestion` API when an application-owned producer needs to write one event without going through the commerce recorders. Resolve the tracked property id first, then pass the same payload shape the ingestion endpoints accept:
+
+```php
+use AIArmada\Signals\Features\Ingestion\Api\SignalIngestion;
+
+$event = app(SignalIngestion::class)->handle(
+    trackedPropertyId: $trackedProperty->getKey(),
+    payload: [
+        'event_name' => 'share.committed_share',
+        'event_category' => 'shares',
+        'source_event_id' => 'committed-share:'.$touchpoint->getKey(),
+        'idempotency_key' => 'committed-share:'.$touchpoint->getKey(),
+        'occurred_at' => $touchedAt->toIso8601String(),
+        'properties' => ['channel' => $channel],
+    ],
+    trusted: true,
+);
+
+$event->id;
+$event->idempotencyKey;
+```
+
+The API resolves the property inside the current owner scope. When owner scoping is enabled, a global property requires an explicit `OwnerContext::withOwner(null, ...)` around the call; a property owned by another owner throws `AuthorizationException`. `trusted: true` records revenue and idempotency fields. `trusted: false` applies the tracked property's property allowlist and forces revenue to zero; it does not run the browser event-name allowlist or reject trusted fields. Callers that accept untrusted input must run `SignalsIngestionRequestValidator::assertUntrustedEvent()` first, as the mobile telemetry action does.
+
 ## Actions
 
 Signals provides reusable Laravel Actions for core ingest, session, and alert operations:

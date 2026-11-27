@@ -31,6 +31,8 @@ Signals configuration lives in `config/signals.php`.
 
 Table names can be overridden individually in `database.tables`. All tables default to the `signal_` prefix. Migrations resolve the JSON column type through `commerce_json_column_type('signals', 'jsonb')`, which prefers `SIGNALS_JSON_COLUMN_TYPE`, then the shared `COMMERCE_JSON_COLUMN_TYPE`, then this config value.
 
+Alert destination columns are the exception: `signal_alert_rules.inline_destinations` and `signal_alert_deliveries.destination` store encrypted payloads, so they use `text` rather than `json_column_type`. Installations that created those columns as `jsonb` are converted by the `2001_01_01_000013_align_encrypted_alert_columns` migration.
+
 ## Defaults
 
 ```php
